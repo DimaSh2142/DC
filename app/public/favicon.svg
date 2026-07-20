@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="DSGame">
+  <!-- Simplified favicon: DS text drops out at tab size, so this crops in on
+       just the horns, glowing eyes and fangs of the logo.svg Krampus, enlarged
+       to fill the frame: the boldest, most legible part at 16-32px. -->
+  <circle cx="100" cy="100" r="92" fill="#FFFFFF" stroke="#9C1B2C" stroke-width="15"/>
+  <g transform="translate(-15,-18) scale(1.15)" stroke="#F2994A" stroke-width="1" stroke-linejoin="round">
+    <path d="M116,112 C122,98 130,80 148,68 C152,66 154,70 150,76 L143,84 L149,86 C138,90 130,100 128,114 C124,116 118,116 116,112 Z" fill="#2A0A10"/>
+    <path d="M84,112 C78,98 70,80 52,68 C48,66 46,70 50,76 L57,84 L51,86 C62,90 70,100 72,114 C76,116 82,116 84,112 Z" fill="#2A0A10"/>
+    <path d="M100,94 L66,104 L58,122 L52,130 L64,140 L84,158 L100,176 L116,158 L136,140 L148,130 L142,122 L134,104 Z" fill="#2A0A10"/>
+    <path d="M58,118 L46,122 L60,132 Z" fill="#2A0A10"/>
+    <path d="M142,118 L154,122 L140,132 Z" fill="#2A0A10"/>
+    <path d="M62,118 L91,109 L90,120 L67,127 Z" fill="#2A0A10"/>
+    <path d="M138,118 L109,109 L110,120 L133,127 Z" fill="#2A0A10"/>
+    <ellipse cx="77" cy="130" rx="9.5" ry="4.5" fill="#F2994A" stroke="none"/>
+    <ellipse cx="123" cy="130" rx="9.5" ry="4.5" fill="#F2994A" stroke="none"/>
+    <ellipse cx="77" cy="130" rx="6.5" ry="1.4" fill="#2A0A10" stroke="none"/>
+    <ellipse cx="123" cy="130" rx="6.5" ry="1.4" fill="#2A0A10" stroke="none"/>
+    <path d="M79,145 C87,155 113,155 121,145 C116,159 84,159 79,145 Z" fill="#9C1B2C" stroke="none"/>
+    <path d="M81,146 L86,154 L90,145 L95,152 L100,144 L105,152 L110,145 L114,154 L119,146" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M79,145 L72,161 L84,147 Z" fill="#FFFFFF" stroke="none"/>
+    <path d="M121,145 L128,161 L116,147 Z" fill="#FFFFFF" stroke="none"/>
+  </g>
+</svg>

@@ -1,0 +1,19 @@
+{
+  "name": "dsgame",
+  "version": "1.1.0",
+  "description": "DSGame — командна вікторина у стилі Своя Гра для друзів dima — черга ходів по командах, адмін-панель, автогенератор тем, голосовий чат команд.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

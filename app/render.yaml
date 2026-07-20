@@ -1,0 +1,24 @@
+# Render.com "Blueprint" deploy config for DSGame -- OPTIONAL, for a
+# permanent public URL (unlike the temporary localtunnel/cloudflared tunnel
+# documented in README.md / PROGRESS.md). Not applied automatically: Claude
+# never creates third-party accounts on dima's behalf. To use this, dima
+# signs up at render.com himself, then either:
+#   (a) "New +" -> "Blueprint" -> connect the repo containing this file, or
+#   (b) "New +" -> "Web Service" -> connect the repo, and set the fields
+#       below manually in the dashboard instead of using this file.
+# Full step-by-step is in README.md "Деплой поза локальною мережею".
+
+services:
+  - type: web
+    name: dsgame
+    runtime: node
+    plan: free
+    rootDir: app
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: ADMIN_PASSWORD
+        sync: false   # set this in the Render dashboard, not in git
+      - key: SESSION_SECRET
+        sync: false   # set this in the Render dashboard, not in git

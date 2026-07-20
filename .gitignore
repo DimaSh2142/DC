@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# secrets — real values live only in app/.env (never committed)
+app/.env
+
+# runtime state — recreated automatically on first run, not source
+app/data/players.json
+app/data/usedThemes.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# large private reference pack — not meant for public distribution
+reference/

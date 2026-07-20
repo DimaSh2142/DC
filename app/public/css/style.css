@@ -1,0 +1,474 @@
+/* DSGame -- strict 4-color palette: white / turquoise / crimson / orange.
+   Body text and shadows use dark/light SHADES of these same hues (not a 5th color)
+   purely for readability -- see README for this design-constraint note. */
+:root {
+  --white: #FFFFFF;
+  --turquoise: #17B8A6;
+  --turquoise-dark: #0E6E64;
+  --turquoise-ink: #0B3D38;   /* body text -- dark shade of turquoise, not a new hue */
+  --turquoise-light: #E6F7F5; /* tint for panels */
+  --crimson: #D7263D;
+  --crimson-dark: #9C1B2C;
+  --crimson-light: #FBE7EA;
+  --orange: #F2994A;
+  --orange-dark: #C4732A;
+  --orange-light: #FDECDC;
+  --shadow: rgba(11, 61, 56, 0.18); /* elevation only, tinted with the ink shade */
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--white);
+  color: var(--turquoise-ink);
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  min-height: 100%;
+  /* Custom cursor for all users (site-wide). SVG arrow re-skinned in the
+     4-color palette, hotspot pinned to the tip (3,2) so precision clicking
+     isn't affected -- falls back to the native arrow if the browser can't
+     load a cursor image (very old browsers / restrictive settings). */
+  cursor: url('/img/cursor-default.svg') 3 2, auto;
+}
+
+/* Distinct "clickable" cursor variant on anything actually interactive.
+   Text inputs are deliberately excluded further down so typing still shows
+   the native text I-beam -- a decorative arrow there would hurt usability. */
+button, a, select, summary,
+.cell:not(:disabled), .logo-option, .tabs button, label[for], .theme-header, .fact-button {
+  cursor: url('/img/cursor-pointer.svg') 3 2, pointer;
+}
+input[type="text"], input[type="password"], input[type="number"], textarea {
+  cursor: text;
+}
+button:disabled, .cell.used, .cell.locked {
+  cursor: not-allowed;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+a { color: var(--turquoise-dark); }
+
+h1, h2, h3 { margin: 0 0 .4em 0; line-height: 1.2; }
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 20px 32px;
+  width: 100%;
+}
+
+.center-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.card {
+  background: var(--white);
+  border: 2px solid var(--turquoise-light);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 24px var(--shadow);
+  padding: 28px;
+}
+
+.brand-title {
+  font-weight: 800;
+  letter-spacing: .5px;
+}
+.brand-title .accent { color: var(--crimson); }
+
+input[type="text"], input[type="password"], input[type="number"], select {
+  font-size: 16px;
+  padding: 12px 14px;
+  border: 2px solid var(--turquoise-light);
+  border-radius: 10px;
+  outline: none;
+  color: var(--turquoise-ink);
+  background: var(--white);
+  width: 100%;
+}
+input:focus, select:focus { border-color: var(--turquoise); }
+
+label { font-weight: 600; font-size: 14px; display: block; margin-bottom: 6px; color: var(--turquoise-dark); }
+.field { margin-bottom: 16px; }
+
+button {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  color: var(--white);
+  background: var(--turquoise);
+  transition: transform .15s cubic-bezier(.34,1.56,.64,1), opacity .15s ease, box-shadow .15s ease;
+}
+button:hover:not(:disabled) { opacity: .9; transform: translateY(-2px); box-shadow: 0 6px 16px var(--shadow); }
+button:active:not(:disabled) { transform: scale(0.96) translateY(0); box-shadow: 0 2px 6px var(--shadow); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+
+button.btn-crimson { background: var(--crimson); }
+button.btn-outline {
+  background: var(--white);
+  color: var(--turquoise-dark);
+  border: 2px solid var(--turquoise);
+}
+button.btn-outline.crimson { color: var(--crimson-dark); border-color: var(--crimson); }
+button.btn-outline.orange { color: var(--orange-dark); border-color: var(--orange); }
+button.btn-small { padding: 7px 12px; font-size: 13px; }
+
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.row.between { justify-content: space-between; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--white);
+  background: var(--turquoise);
+}
+.badge.crimson { background: var(--crimson); }
+.badge.orange { background: var(--orange); }
+.badge.outline {
+  background: var(--white);
+  color: var(--turquoise-dark);
+  border: 1.5px solid var(--turquoise);
+}
+
+.room-code {
+  font-family: 'Courier New', monospace;
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: 8px;
+  color: var(--crimson);
+  text-align: center;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--turquoise-ink);
+  color: var(--white);
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  z-index: 999;
+  box-shadow: 0 6px 20px var(--shadow);
+  max-width: 90vw;
+}
+.toast.error { background: var(--crimson-dark); }
+
+/* ---- game board ----
+   .board's column widths come from an inline `grid-template-columns:
+   repeat(N, minmax(0,1fr))` set in JS (player.js renderBoard / admin.js
+   renderBoardMonitor) -- the minmax(0, ...) is what lets columns actually
+   shrink below their content's intrinsic width instead of forcing the whole
+   grid (and therefore .board-wrap) into horizontal scroll on an ordinary
+   window size. overflow-x:auto stays only as a safety net for extreme cases
+   (many themes on a narrow phone), it should not normally be needed. */
+.board-wrap { overflow-x: auto; }
+.board {
+  display: grid;
+  gap: 6px;
+}
+.theme-header {
+  background: var(--turquoise-dark);
+  color: var(--white);
+  padding: 10px 6px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 0;
+  transition: background-color .15s ease, transform .15s ease;
+}
+.theme-header:hover { background: var(--turquoise-ink); transform: translateY(-1px); }
+.cell {
+  background: var(--turquoise);
+  color: var(--white);
+  border-radius: 8px;
+  padding: 12px 4px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 18px;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  min-width: 0;
+  transition: transform .15s cubic-bezier(.34,1.56,.64,1), opacity .2s ease, box-shadow .15s ease, background-color .3s ease, color .3s ease;
+}
+.cell:hover:not(:disabled) { opacity: .85; transform: translateY(-3px) scale(1.04); box-shadow: 0 8px 16px var(--shadow); }
+.cell:active:not(:disabled) { transform: scale(0.94); }
+/* "used" cells used to be background==color (fully invisible text, looked
+   like a broken hole in the board) -- now a muted turquoise checkmark on a
+   light turquoise pill, so it visibly reads as "already played" instead of
+   "empty/missing". */
+.cell.used { background: var(--turquoise-light); color: var(--turquoise); opacity: .7; cursor: default; font-size: 16px; }
+.cell.locked { background: var(--turquoise-light); color: var(--turquoise-dark); opacity: .6; cursor: default; }
+@media (max-width: 640px) {
+  .cell { font-size: 14px; padding: 9px 3px; }
+  .theme-header { font-size: 11px; padding: 8px 4px; min-height: 38px; }
+}
+
+.teams-bar { display: flex; gap: 12px; flex-wrap: wrap; margin: 14px 0; }
+.team-pill {
+  position: relative;
+  border-radius: 12px;
+  padding: 10px 16px;
+  color: var(--white);
+  min-width: 140px;
+  box-shadow: 0 3px 10px var(--shadow);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.team-pill .score { font-size: 22px; font-weight: 800; transition: color .2s ease; }
+.team-pill.team-turquoise { background: var(--turquoise); }
+.team-pill.team-crimson { background: var(--crimson); }
+.team-pill.team-orange { background: var(--orange); }
+.team-pill.team-turquoise-dark { background: var(--turquoise-dark); }
+.team-pill.team-crimson-dark { background: var(--crimson-dark); }
+.team-pill.team-orange-dark { background: var(--orange-dark); }
+.team-pill.active { outline: 3px solid var(--turquoise-ink); outline-offset: 2px; animation: active-glow 1.8s ease-in-out infinite; }
+@keyframes active-glow {
+  0%, 100% { box-shadow: 0 3px 10px var(--shadow); }
+  50% { box-shadow: 0 3px 22px rgba(23, 184, 166, 0.75); }
+}
+.team-pill.score-pulse { animation: pill-pulse .6s ease; }
+@keyframes pill-pulse {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.09); }
+  100% { transform: scale(1); }
+}
+.score-float {
+  position: absolute;
+  top: -6px;
+  right: 10px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--white);
+  text-shadow: 0 2px 6px rgba(0,0,0,.35);
+  animation: float-up 1.4s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes float-up {
+  0% { opacity: 0; transform: translateY(4px); }
+  15% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-26px); }
+}
+
+.clue-panel {
+  background: var(--turquoise-light);
+  border: 2px solid var(--turquoise);
+  border-radius: var(--radius);
+  padding: 22px;
+  margin: 16px 0;
+  animation: clue-in .35s ease-out;
+}
+@keyframes clue-in {
+  from { opacity: 0; transform: translateY(-14px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+.clue-text { font-size: 20px; font-weight: 600; line-height: 1.4; }
+
+.clue-image-wrap { margin-top: 14px; text-align: center; }
+.clue-image {
+  max-width: 100%;
+  max-height: 360px;
+  border-radius: 10px;
+  border: 2px solid var(--turquoise);
+  box-shadow: 0 6px 20px var(--shadow);
+}
+
+.logo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+.logo-option {
+  background: var(--white);
+  border: 3px solid var(--turquoise-light);
+  border-radius: 10px;
+  padding: 6px;
+  cursor: pointer;
+  transition: border-color .2s ease, background-color .2s ease, transform .15s ease;
+}
+.logo-option:hover { border-color: var(--turquoise); transform: translateY(-2px); }
+.logo-option svg { width: 100%; height: auto; display: block; }
+.logo-option.correct { border-color: var(--turquoise); background: var(--turquoise-light); animation: pill-pulse .5s ease; }
+.logo-option.incorrect { border-color: var(--crimson); background: var(--crimson-light); }
+
+.timer-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--turquoise-light);
+  overflow: hidden;
+  margin: 10px 0;
+}
+.timer-bar-fill { height: 100%; background: var(--orange); transition: width 1s linear, background-color .3s ease; }
+.timer-bar-fill.low { background: var(--crimson); animation: timer-urgent .5s ease-in-out infinite alternate; }
+@keyframes timer-urgent { from { opacity: 1; } to { opacity: .55; } }
+
+.result-banner { padding: 16px 20px; border-radius: 12px; font-weight: 700; font-size: 18px; margin: 14px 0; animation: pop-in .3s cubic-bezier(.34,1.56,.64,1); }
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(.88); }
+  to { opacity: 1; transform: scale(1); }
+}
+.result-banner.correct { background: var(--turquoise-light); color: var(--turquoise-dark); border: 2px solid var(--turquoise); }
+.result-banner.incorrect { background: var(--crimson-light); color: var(--crimson-dark); border: 2px solid var(--crimson); }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--turquoise-light); font-size: 14px; }
+th { color: var(--turquoise-dark); }
+
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.dot.on { background: var(--turquoise); }
+.dot.off { background: var(--crimson); }
+
+.footer-note { text-align: center; font-size: 12px; color: var(--turquoise-dark); opacity: .75; margin-top: 30px; }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.tabs button { background: var(--white); color: var(--turquoise-dark); border: 2px solid var(--turquoise-light); }
+.tabs button.active { background: var(--turquoise); color: var(--white); border-color: var(--turquoise); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 760px) { .grid-2 { grid-template-columns: 1fr; } .logo-grid { grid-template-columns: 1fr; } }
+
+/* ---- confetti (correct answer / game end) ---- */
+.confetti-layer { position: fixed; inset: 0; pointer-events: none; z-index: 999; overflow: hidden; }
+.confetti-piece {
+  position: absolute;
+  top: -20px;
+  width: 9px;
+  height: 14px;
+  opacity: 0.9;
+  border-radius: 2px;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(.35,.1,.6,.9);
+  animation-fill-mode: forwards;
+}
+@keyframes confetti-fall {
+  0% { transform: translate(0,0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--drift), 108vh) rotate(var(--rot)); opacity: .25; }
+}
+
+/* ---- roster/score-adjust panel (host controls) ---- */
+.roster-list { max-height: 380px; overflow-y: auto; padding-right: 4px; }
+.player-row-controls { display: flex; align-items: center; gap: 6px; }
+.score-adjust-input { width: 56px; padding: 6px 8px; font-size: 13px; }
+.team-score-adjust { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.warn-banner {
+  background: var(--orange-light);
+  border: 2px solid var(--orange);
+  color: var(--orange-dark);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 10px 0;
+}
+
+/* ---- player avatars ---- */
+.avatar-circle {
+  background: var(--turquoise-light);
+  color: var(--turquoise-dark);
+  border: 2px solid var(--white);
+  box-shadow: 0 0 0 1.5px var(--turquoise);
+}
+.avatar-picker { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+.avatar-picker-preview .avatar-circle { border: 3px solid var(--turquoise); box-shadow: 0 4px 12px var(--shadow); }
+.avatar-picker-label { font-size: 12px; font-weight: 600; color: var(--turquoise-dark); }
+.avatar-remove-link { display: block; text-align: center; font-size: 12px; margin-top: -4px; }
+.roster-row { display: flex; align-items: center; gap: 8px; }
+.mini-roster { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.mini-roster-row { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.mini-roster-row .avatar-circle { width: 22px; height: 22px; border-width: 1.5px; font-size: 11px !important; }
+.player-row-controls .team-move-select { width: auto; padding: 6px 8px; font-size: 12px; }
+
+/* ---- generic modal (theme-rules popover, random-fact button) ---- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 61, 56, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: modal-fade-in .2s ease-out;
+}
+@keyframes modal-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.modal-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 2px solid var(--turquoise);
+  box-shadow: 0 16px 48px rgba(11, 61, 56, 0.35);
+  padding: 24px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 82vh;
+  overflow-y: auto;
+  animation: pop-in .25s cubic-bezier(.34,1.56,.64,1);
+}
+.modal-body { margin-top: 10px; line-height: 1.5; }
+.modal-body p { margin: 0 0 12px; }
+.modal-body ol, .modal-body ul { margin: 0 0 12px; padding-left: 22px; }
+.modal-body li { margin-bottom: 6px; }
+
+/* ---- round-transition banner ---- */
+.round-banner-layer {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+  pointer-events: none;
+  padding: 20px;
+}
+.round-banner-card {
+  background: var(--turquoise-dark);
+  color: var(--white);
+  padding: 26px 42px;
+  border-radius: 18px;
+  box-shadow: 0 16px 48px var(--shadow);
+  text-align: center;
+  max-width: 90vw;
+  animation: round-banner-in .4s cubic-bezier(.34,1.56,.64,1) both,
+             round-banner-out .5s ease-in 3.3s both;
+}
+.round-banner-card .title { font-size: 26px; font-weight: 800; }
+.round-banner-card .subtitle { font-size: 16px; font-weight: 600; color: var(--turquoise-light); margin-top: 6px; }
+@keyframes round-banner-in {
+  from { opacity: 0; transform: scale(.8) translateY(-24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes round-banner-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: scale(.94); }
+}
+
+/* ---- fun-fact button (fills empty space, see README "Дрібниці") ---- */
+.fact-button {
+  background: var(--orange);
+  margin-top: 14px;
+}
+.fact-button:hover:not(:disabled) { background: var(--orange-dark); }
