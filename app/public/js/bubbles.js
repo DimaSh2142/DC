@@ -23,8 +23,6 @@
   let nickname = (localStorage.getItem(NICK_KEY) || '').trim();
 
   const gateSection = document.getElementById('gate-section');
-  const gateForm = document.getElementById('gate-form');
-  const gateInput = document.getElementById('gate-nickname');
   const gameSection = document.getElementById('game-section');
   const levelEl = document.getElementById('bubbles-level');
   const kkoinEl = document.getElementById('bubbles-kkoin');
@@ -490,13 +488,9 @@
     }).catch(() => toast('Не вдалося з’єднатися із сервером', true));
   }
 
-  gateForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const nick = gateInput.value.trim();
-    if (!nick) return toast('Введіть нікнейм', true);
-    boot(nick);
-  });
-
-  if (nickname) boot(nickname);
-  else gateInput.focus();
+  // dima 2026-07-21 "видали гостя, зроби реєстрацію обов'язковою скрізь" --
+  // #gate-section раніше було статичною формою "просто впиши нікнейм"; тепер
+  // requireAccount() (common.js) сама вирішує показати логін/реєстрацію чи,
+  // якщо вже є валідна сесія (getAuth()), одразу пропустити далі до boot().
+  requireAccount(gateSection, { title: 'Бульбашки', emoji: '🫧' }, boot);
 })();

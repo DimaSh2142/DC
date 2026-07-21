@@ -132,7 +132,18 @@
 
   function render() {
     clear(app);
-    if (!joined || !roomState) return renderJoin();
+    if (!joined || !roomState) {
+      // dima 2026-07-21 "видали гостя, зроби реєстрацію обов'язковою скрізь"
+      // -- перш ніж показати екран приєднання (нікнейм+код кімнати), треба
+      // реальний акаунт. requireAccount() сама вирішує чи вже увійшли
+      // (getAuth()) -- якщо так, onReady() спрацює миттєво і renderJoin()
+      // покаже звичний екран одразу, без жодної додаткової форми.
+      return requireAccount(app, { title: 'Гравець DSLand', emoji: '🧠', subtitle: 'Увійди, щоб приєднатись до вікторини.' }, (login) => {
+        me.nickname = login;
+        clear(app);
+        renderJoin();
+      });
+    }
     if (roomState.status === 'lobby') return renderLobby();
     if (roomState.status === 'ready_check') return renderReadyCheck();
     if (roomState.status === 'in_progress') return renderGame();
@@ -140,7 +151,7 @@
   }
 
   function renderJoin() {
-    const nickInput = el('input', { type: 'text', id: 'nick', placeholder: 'Наприклад, Діма', value: me.nickname, maxlength: '24' });
+    const nickInput = el('input', { type: 'text', id: 'nick', value: me.nickname, maxlength: '24', readonly: 'readonly', title: 'Нікнейм визначається акаунтом -- вийти можна в Особистому кабінеті' });
     const codeInput = el('input', { type: 'text', id: 'code', placeholder: 'Наприклад, AB3K', value: me.roomCode, maxlength: '8', style: 'text-transform:uppercase; letter-spacing:3px; font-weight:700;' });
 
     // ---- avatar picker ----
@@ -198,7 +209,7 @@
       });
     }}, [
       el('div', { class: 'field', style: 'text-align:center;' }, [avatarPicker, avatarRemoveWrap]),
-      el('div', { class: 'field' }, [el('label', {}, ['Нікнейм']), nickInput]),
+      el('div', { class: 'field' }, [el('label', {}, ['Граєш як']), nickInput]),
       el('div', { class: 'field' }, [el('label', {}, ['Код кімнати']), codeInput]),
       el('button', { type: 'submit' }, ['Приєднатися до гри'])
     ]);

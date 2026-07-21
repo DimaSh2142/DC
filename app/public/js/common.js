@@ -55,6 +55,79 @@ function getAuth() {
 function setAuth(auth) { localStorage.setItem(AUTH_KEY, JSON.stringify(auth)); }
 function clearAuth() { localStorage.removeItem(AUTH_KEY); }
 
+// ---- mandatory account gate (2026-07-21, dima: "видали гостя, зроби
+// реєстрацію обов'язковою всюди -- скрізь, без винятків") -- every page that
+// used to accept a freely-typed nickname (вікторина, 3 міні-ігри, Бульбашки)
+// now requires a real login FIRST. Reuses the exact login-or-register call
+// profile.js already had as one of two paths (POST /api/auth/login,
+// auto-register on ACCOUNT_NOT_FOUND) -- just makes it the ONLY path in,
+// everywhere. Once logged in, the returned login IS the nickname from then
+// on in that page -- no separate freely-typed nickname field alongside it
+// anymore. Not a new security boundary server-side (see getAuth()'s own
+// caveat above) -- this is deliberately a UI-level gate only, so it reuses
+// the untouched, already-tested socket/REST join protocol underneath (still
+// just a nickname string) instead of rewriting room-join authorization
+// across the quiz + 3 mini-games, which would be a much bigger, riskier
+// change for a trust-based friend-group app.
+function requireAccount(container, opts, onReady) {
+  // sigame_nickname is a much older key that predates accounts entirely --
+  // player.js/checkers.js/battleship.js/chess.js's reconnect-after-refresh
+  // logic still reads it directly (see each file's mg:reconnect call), so
+  // every path below keeps it in sync with whatever login just succeeded
+  // rather than requiring each of those files to remember to do it.
+  function ready(login) {
+    localStorage.setItem('sigame_nickname', login);
+    onReady(login);
+  }
+
+  const auth = getAuth();
+  if (auth && auth.token && auth.login) return ready(auth.login);
+
+  opts = opts || {};
+  const nickInput = el('input', { type: 'text', placeholder: 'Наприклад, Dima', maxlength: '24', autocomplete: 'off' });
+  const passInput = el('input', { type: 'password', placeholder: 'Мінімум 4 символи', maxlength: '72' });
+  function submit() {
+    const nickname = nickInput.value.trim();
+    const password = passInput.value;
+    if (!nickname) return toast('Введіть нікнейм', true);
+    if (!password) return toast('Введіть пароль', true);
+    fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login: nickname, password })
+    }).then((r) => r.json().then((data) => ({ status: r.status, data }))).then(({ status, data }) => {
+      if (status === 200) { setAuth({ token: data.token, login: data.login, role: data.role }); return ready(data.login); }
+      if (data && data.code === 'ACCOUNT_NOT_FOUND') {
+        return fetch('/api/auth/register', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ login: nickname, password })
+        }).then((r) => r.json().then((d2) => ({ status: r.status, data: d2 }))).then(({ status: s2, data: d2 }) => {
+          if (s2 !== 200) return toast((d2 && d2.error) || 'Не вдалося зареєструватись', true);
+          setAuth({ token: d2.token, login: d2.login, role: d2.role });
+          toast('Акаунт створено!');
+          ready(d2.login);
+        });
+      }
+      toast((data && data.error) || 'Невірний пароль', true);
+    }).catch(() => toast('Не вдалося з’єднатися із сервером', true));
+  }
+  const form = el('form', { class: 'stack', onsubmit: (e) => { e.preventDefault(); submit(); } }, [
+    el('div', { class: 'field' }, [el('label', {}, ['Нікнейм']), nickInput]),
+    el('div', { class: 'field' }, [el('label', {}, ['Пароль']), passInput]),
+    el('button', { type: 'submit' }, ['Увійти / Зареєструватись'])
+  ]);
+  clear(container);
+  container.appendChild(el('div', { class: 'center-screen', style: 'min-height:80vh;' }, [
+    el('div', { class: 'card', style: 'max-width:380px; width:100%;' }, [
+      opts.backLink || null,
+      el('div', { style: 'text-align:center; font-size:36px; margin-bottom:6px;' }, [opts.emoji || '🔑']),
+      el('h1', { style: 'text-align:center; margin-top:0;' }, [opts.title || 'Увійти або зареєструватись']),
+      opts.subtitle ? el('p', { style: 'text-align:center; color:var(--turquoise-dark);' }, [opts.subtitle]) : null,
+      form
+    ])
+  ]));
+  nickInput.focus();
+}
+
 // ---- sound effects (2026-07-21, dima: "Можеш і звукові ефекти добавити" +
 // uploaded JDSherbert Sci-Fi UI / Tabletop Games SFX packs -- both marked
 // "FREE" by the author, see README.md's asset-attribution note for why there

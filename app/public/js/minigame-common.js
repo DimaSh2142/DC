@@ -14,50 +14,56 @@ function mgRoomStorageKey(gameType) { return 'mg_room_' + gameType; }
 // Renders the "join or create a room" screen into #app. Calls
 // onJoined({ roomCode, playerIdx, room }) once socket join/create succeeds
 // (the caller owns roomState/render() from that point on).
+//
+// dima 2026-07-21 "видали гостя, зроби реєстрацію обов'язковою скрізь" --
+// gated behind requireAccount() (common.js) first; the nickname used for
+// mg:create_room/mg:join_room below is now always the verified login, never
+// a freely-typed value.
 function mgRenderJoinScreen(socket, app, opts) {
-  const nickname = localStorage.getItem('sigame_nickname') || '';
-  const nickInput = el('input', { type: 'text', placeholder: 'Наприклад, Діма', value: nickname, maxlength: '24' });
-  const codeInput = el('input', { type: 'text', placeholder: 'Код кімнати', maxlength: '8', style: 'text-transform:uppercase; letter-spacing:3px; font-weight:700;' });
+  const backLink = el('a', { href: '/minigames.html', class: 'back-link' }, ['← До міні-ігор']);
+  requireAccount(app, { title: opts.gameLabel, emoji: opts.emoji, backLink }, (nickname) => {
+    renderActualJoinScreen(nickname);
+  });
 
-  function doCreate() {
-    const nick = nickInput.value.trim();
-    if (!nick) return toast('Вкажіть нікнейм', true);
-    localStorage.setItem('sigame_nickname', nick);
-    socket.emit('mg:create_room', { gameType: opts.gameType, nickname: nick }, (res) => {
-      if (res.error) return toast(res.error, true);
-      localStorage.setItem(mgRoomStorageKey(opts.gameType), res.room.code);
-      opts.onJoined({ roomCode: res.room.code, playerIdx: res.playerIdx, room: res.room });
-    });
-  }
-  function doJoin() {
-    const nick = nickInput.value.trim();
-    const code = codeInput.value.trim().toUpperCase();
-    if (!nick || !code) return toast('Вкажіть нікнейм і код кімнати', true);
-    localStorage.setItem('sigame_nickname', nick);
-    socket.emit('mg:join_room', { gameType: opts.gameType, roomCode: code, nickname: nick }, (res) => {
-      if (res.error) return toast(res.error, true);
-      localStorage.setItem(mgRoomStorageKey(opts.gameType), res.room.code);
-      opts.onJoined({ roomCode: res.room.code, playerIdx: res.playerIdx, room: res.room });
-    });
-  }
+  function renderActualJoinScreen(nickname) {
+    const nickInput = el('input', { type: 'text', value: nickname, maxlength: '24', readonly: 'readonly', title: 'Нікнейм визначається акаунтом -- вийти можна в Особистому кабінеті' });
+    const codeInput = el('input', { type: 'text', placeholder: 'Код кімнати', maxlength: '8', style: 'text-transform:uppercase; letter-spacing:3px; font-weight:700;' });
 
-  clear(app);
-  app.appendChild(el('div', { class: 'center-screen', style: 'min-height:80vh;' }, [
-    el('div', { class: 'card', style: 'max-width:420px; width:100%;' }, [
-      el('a', { href: '/minigames.html', class: 'back-link' }, ['← До міні-ігор']),
-      el('div', { style: 'text-align:center; font-size:40px; margin-bottom:6px;' }, [opts.emoji]),
-      el('h1', { style: 'text-align:center; margin-top:0;' }, [opts.gameLabel]),
-      el('div', { class: 'field' }, [el('label', {}, ['Нікнейм']), nickInput]),
-      el('div', { class: 'stack' }, [
-        el('button', { onclick: doCreate }, ['Створити нову гру']),
-        el('div', { class: 'row', style: 'align-items:flex-end;' }, [
-          el('div', { class: 'field', style: 'flex:1; margin-bottom:0;' }, [el('label', {}, ['Або приєднатись за кодом']), codeInput]),
-          el('button', { class: 'btn-outline', onclick: doJoin }, ['Приєднатись'])
+    function doCreate() {
+      socket.emit('mg:create_room', { gameType: opts.gameType, nickname }, (res) => {
+        if (res.error) return toast(res.error, true);
+        localStorage.setItem(mgRoomStorageKey(opts.gameType), res.room.code);
+        opts.onJoined({ roomCode: res.room.code, playerIdx: res.playerIdx, room: res.room });
+      });
+    }
+    function doJoin() {
+      const code = codeInput.value.trim().toUpperCase();
+      if (!code) return toast('Вкажіть код кімнати', true);
+      socket.emit('mg:join_room', { gameType: opts.gameType, roomCode: code, nickname }, (res) => {
+        if (res.error) return toast(res.error, true);
+        localStorage.setItem(mgRoomStorageKey(opts.gameType), res.room.code);
+        opts.onJoined({ roomCode: res.room.code, playerIdx: res.playerIdx, room: res.room });
+      });
+    }
+
+    clear(app);
+    app.appendChild(el('div', { class: 'center-screen', style: 'min-height:80vh;' }, [
+      el('div', { class: 'card', style: 'max-width:420px; width:100%;' }, [
+        el('a', { href: '/minigames.html', class: 'back-link' }, ['← До міні-ігор']),
+        el('div', { style: 'text-align:center; font-size:40px; margin-bottom:6px;' }, [opts.emoji]),
+        el('h1', { style: 'text-align:center; margin-top:0;' }, [opts.gameLabel]),
+        el('div', { class: 'field' }, [el('label', {}, ['Граєш як']), nickInput]),
+        el('div', { class: 'stack' }, [
+          el('button', { onclick: doCreate }, ['Створити нову гру']),
+          el('div', { class: 'row', style: 'align-items:flex-end;' }, [
+            el('div', { class: 'field', style: 'flex:1; margin-bottom:0;' }, [el('label', {}, ['Або приєднатись за кодом']), codeInput]),
+            el('button', { class: 'btn-outline', onclick: doJoin }, ['Приєднатись'])
+          ])
         ])
       ])
-    ])
-  ]));
-  nickInput.focus();
+    ]));
+    codeInput.focus();
+  }
 }
 
 function mgRenderWaitingForOpponent(app, roomCode, opts) {

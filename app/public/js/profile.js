@@ -226,18 +226,16 @@
     }).catch(() => toast('Не вдалося з’єднатися із сервером', true));
   }
 
+  // dima 2026-07-21 "видали гостя, зроби реєстрацію обов'язковою скрізь" --
+  // раніше порожній пароль тут відкривав кабінет без акаунту (гостьовий
+  // шлях); тепер пароль обов'язковий і завжди йде через authenticateAndOpen
+  // (логін, або авторреєстрація якщо це новий нікнейм -- див. її ж коментар).
   gateForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const nickname = gateInput.value.trim();
     const password = gatePasswordInput.value;
     if (!nickname) return toast('Введіть нікнейм', true);
-    if (!password) {
-      // Guest path, unchanged from before accounts existed -- also drops any
-      // previously-cached session so a shared device can't leak an earlier
-      // person's admin panel/account badge into this nickname's guest view.
-      clearAuth();
-      return loadProfile(nickname);
-    }
+    if (!password) return toast('Введіть пароль', true);
     authenticateAndOpen(nickname, password);
   });
 
@@ -497,6 +495,11 @@
   }
 
   initSettingsControls();
-  if (currentNickname) loadProfile(currentNickname);
+  // dima 2026-07-21 "видали гостя" -- раніше будь-який кешований
+  // sigame_nickname сам по собі відкривав кабінет без жодної перевірки; тепер
+  // авто-відкриття дозволене лише якщо є ЖИВА сесія САМЕ під цим нікнеймом
+  // (sessionMatchesOpenProfile), інакше показуємо форму входу/реєстрації.
+  const cachedAuth = getAuth();
+  if (currentNickname && cachedAuth && cachedAuth.token && sessionMatchesOpenProfile(cachedAuth)) loadProfile(currentNickname);
   else gateInput.focus();
 })();
