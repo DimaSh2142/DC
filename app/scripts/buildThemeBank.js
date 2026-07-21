@@ -7,10 +7,12 @@
 const fs = require('fs');
 const path = require('path');
 const { generateLogoChallenge } = require('../src/logo/logoGenerator');
-const part1 = require('../data/handAuthoredThemes.part1.js');
-const part2 = require('../data/handAuthoredThemes.part2.js');
-const part3 = require('../data/handAuthoredThemes.part3.js');
-const part4 = require('../data/handAuthoredThemes.part4.js');
+// Real .siq packs dima provided (4 Ukrainian + 3 Russian, kept untranslated
+// per his instruction) -- see PROGRESS.md for the extraction pipeline. This
+// REPLACES the old hand-authored text-vibe placeholder bank (part1-4),
+// which existed only as a stopgap for when no real quiz packs were
+// available yet (dima's instruction: "Видали старі теми та запитання").
+const importedSiqThemes = require('../data/importedSiqThemes.json');
 
 const LOGO_THEME_DEFS = [
   { id: 'logo-1', name: 'Правильний логотип' },
@@ -45,46 +47,8 @@ function buildLogoThemes() {
 }
 
 function main() {
-  const allHandAuthored = [
-    ...part1.movieVibeThemes,
-    ...part1.gameVibeThemes,
-    ...part1.unusualGamesThemes,
-    ...part2.emojiMovieThemes,
-    ...part2.languageThemes,
-    ...part2.geographyThemes,
-    ...part2.animeRoomThemes,
-    ...part2.musicThemes,
-    ...part2.marketplaceThemes,
-    ...part2.memeThemes,
-    ...part3.movieVibeThemes2,
-    ...part3.gameVibeThemes2,
-    ...part3.emojiMovieThemes2,
-    ...part3.languageThemes2,
-    ...part3.geographyThemes2,
-    ...part3.musicThemes2,
-    ...part3.marketplaceThemes2,
-    ...part3.memeThemes2,
-    ...part3.unusualGamesThemes2,
-    ...part3.animeRoomThemes2,
-    ...part4.movieVibeThemes3,
-    ...part4.gameVibeThemes3,
-    ...part4.unusualGamesThemes3,
-    ...part4.emojiMovieThemes3,
-    ...part4.languageThemes3,
-    ...part4.geographyThemes3,
-    ...part4.animeRoomThemes3,
-    ...part4.musicThemes3,
-    ...part4.marketplaceThemes3,
-    ...part4.memeThemes3,
-    ...part4.sportVibeThemes,
-    ...part4.historyVibeThemes,
-    ...part4.cartoonVibeThemes,
-    ...part4.foodVibeThemes,
-    ...part4.flagVibeThemes,
-    ...part4.sloganThemes
-  ];
   const logoThemes = buildLogoThemes();
-  const bank = [...allHandAuthored, ...logoThemes];
+  const bank = [...importedSiqThemes, ...logoThemes];
 
   // sanity checks
   const ids = new Set();

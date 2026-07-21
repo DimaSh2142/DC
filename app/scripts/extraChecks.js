@@ -127,10 +127,42 @@ check(missing.fallback === true, 'jsonStore returns fallback for missing file in
 check(bank.length >= 60, 'theme bank has at least 60 themes after the 2026-07-20 expansion (' + bank.length + ')');
 const totalQuestions = bank.reduce((s, t) => s + t.questions.length, 0);
 check(totalQuestions >= 300, 'theme bank has at least 300 questions after the 2026-07-20 expansion (' + totalQuestions + ')');
-const NEW_CATEGORIES_2026_07_20 = ['sport-vibe', 'history-vibe', 'cartoon-vibe', 'food-vibe', 'flag-vibe', 'slogan'];
-for (const cat of NEW_CATEGORIES_2026_07_20) {
-  check(bank.some(t => t.category === cat), 'new category "' + cat + '" has at least one theme in the bank');
+
+// ---------- 2026-07-21: real .siq pack import replaced the old hand-authored
+// placeholder bank (dima: "Видали старі теми та запитання"). These checks
+// replace the old NEW_CATEGORIES_2026_07_20 assertions (those categories no
+// longer exist by design) with checks specific to the imported content:
+// every referenced media file must actually exist on disk, and every
+// imported theme must carry a recognized language tag (Russian packs are
+// included untranslated per dima's later instruction, not excluded).
+const IMPORTED_PACK_CATEGORIES = ['atb', 'ihrova-solianochka', 'sup-zi-solianky', 'solianka-1', 'norm-pak-2', 'solyanka-4', 'kompot-dlya-ovochiv-3'];
+for (const cat of IMPORTED_PACK_CATEGORIES) {
+  check(bank.some(t => t.category === cat), 'imported pack category "' + cat + '" has at least one theme in the bank');
 }
+
+const importedThemes = bank.filter(t => IMPORTED_PACK_CATEGORIES.includes(t.category));
+const VALID_LANGS = new Set(['ua', 'ru', 'ambiguous', 'none']);
+const badLang = importedThemes.filter(t => !VALID_LANGS.has(t.lang));
+check(badLang.length === 0, 'every imported theme has a recognized lang tag (' + badLang.length + ' bad)');
+
+const mediaDir = path.join(__dirname, '..', 'public', 'media');
+let mediaRefs = 0, mediaMissing = 0;
+for (const t of importedThemes) {
+  for (const q of t.questions) {
+    for (const key of ['imageUrl', 'audioUrl']) {
+      const url = q.clue && q.clue[key];
+      if (!url) continue;
+      mediaRefs++;
+      const rel = url.replace(/^\/media\//, '');
+      if (!fs.existsSync(path.join(mediaDir, rel))) {
+        mediaMissing++;
+        console.log('  -> missing media file on disk:', url, '(theme ' + t.id + ')');
+      }
+    }
+  }
+}
+check(mediaRefs > 0, 'imported bank actually references some media files (' + mediaRefs + ')');
+check(mediaMissing === 0, 'every referenced media file exists on disk (' + mediaMissing + ' missing of ' + mediaRefs + ')');
 
 console.log('');
 console.log(fails === 0 ? 'ALL EXTRA CHECKS PASSED' : (fails + ' EXTRA CHECK(S) FAILED'));

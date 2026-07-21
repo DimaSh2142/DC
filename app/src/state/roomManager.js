@@ -368,9 +368,11 @@ class RoomManager {
     const publicClue = { kind: question.clue.kind, text: question.clue.text };
     if (question.clue.kind === 'logo') publicClue.options = question.clue.options;
     // Optional real screenshot/art attached to a text clue (e.g. the
-    // "Незвичні ігри" theme) -- must be explicitly forwarded here since this
-    // object is a hand-picked whitelist, not a spread of the full clue.
+    // "Незвичні ігри" theme, and now the imported real .siq packs) -- must be
+    // explicitly forwarded here since this object is a hand-picked whitelist,
+    // not a spread of the full clue.
     if (question.clue.imageUrl) publicClue.imageUrl = question.clue.imageUrl;
+    if (question.clue.audioUrl) publicClue.audioUrl = question.clue.audioUrl;
 
     const openedPayload = {
       code: room.code, // lets a client (esp. an admin socket that may be

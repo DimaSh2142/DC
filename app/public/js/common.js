@@ -96,6 +96,66 @@ function showRoundBanner(title, subtitle) {
   roundBannerHandle = { layer, timeout };
 }
 
+// ---- shared YouTube background-music helpers (admin panel + team panel) ----
+// Both admin.js (host music) and player.js (per-team music) run their own
+// completely independent YT.Player instance in their own browser tab/device
+// -- by design there is no cross-device sync (see admin.js's own caption:
+// music plays from whichever device opened it, never streamed over the
+// socket). Only this parsing/bootstrap/formatting logic is actually shared.
+
+function extractYouTubeId(input) {
+  if (!input) return null;
+  const trimmed = String(input).trim();
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtu\.be\/)([A-Za-z0-9_-]{11})/,
+    /^([A-Za-z0-9_-]{11})$/
+  ];
+  for (const re of patterns) {
+    const m = trimmed.match(re);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+function ensureYouTubeApi(cb) {
+  if (window.YT && window.YT.Player) return cb();
+  if (!document.getElementById('yt-iframe-api-script')) {
+    const tag = document.createElement('script');
+    tag.id = 'yt-iframe-api-script';
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(tag);
+  }
+  const prevReady = window.onYouTubeIframeAPIReady;
+  window.onYouTubeIframeAPIReady = () => { if (prevReady) { try { prevReady(); } catch (e) {} } cb(); };
+}
+
+function formatPlayTime(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+// Polls a YT.Player (via getPlayer(), so the caller can swap the underlying
+// instance freely) and keeps a progress bar fill + "m:ss / m:ss" label
+// updated -- looked up fresh by id every tick (same resilience pattern as
+// admin.js's startAdminTimer/player.js's startTimer) so it survives the
+// frequent full re-renders triggered by room:state broadcasts. One ticker
+// runs per caller (admin has its own, each player tab has its own).
+function startMusicProgressTicker(getPlayer, fillId, labelId) {
+  return setInterval(() => {
+    const player = getPlayer();
+    const fill = document.getElementById(fillId);
+    const label = document.getElementById(labelId);
+    if (!fill || !label) return;
+    if (!player || typeof player.getDuration !== 'function') { label.textContent = '0:00 / 0:00'; fill.style.width = '0%'; return; }
+    let dur = 0, cur = 0;
+    try { dur = player.getDuration() || 0; cur = player.getCurrentTime() || 0; } catch (e) { return; } // not ready yet
+    fill.style.width = (dur > 0 ? Math.min(100, Math.round((cur / dur) * 100)) : 0) + '%';
+    label.textContent = formatPlayTime(cur) + ' / ' + formatPlayTime(dur);
+  }, 500);
+}
+
 // Lightweight dependency-free confetti burst, palette colors only.
 // Used on correct answers and at game end (see player.js).
 function confettiBurst(count) {

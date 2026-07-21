@@ -269,6 +269,8 @@
       })));
       const lobbyVoicePanel = renderVoicePanel();
       if (lobbyVoicePanel) wrap.appendChild(lobbyVoicePanel);
+      const lobbyMusicPanel = renderTeamMusicPanel();
+      if (lobbyMusicPanel) wrap.appendChild(lobbyMusicPanel);
       // Players who joined after teams were formed have no teamId yet --
       // call this out explicitly instead of silently omitting them from
       // every team pill above, which otherwise looks like a bug ("where did
@@ -317,6 +319,8 @@
     wrap.appendChild(renderTeamsBar());
     const gameVoicePanel = renderVoicePanel();
     if (gameVoicePanel) wrap.appendChild(gameVoicePanel);
+    const gameMusicPanel = renderTeamMusicPanel();
+    if (gameMusicPanel) wrap.appendChild(gameMusicPanel);
 
     if (!myTeamId()) {
       // Joined after the admin formed teams (or reconnected after being
@@ -408,6 +412,14 @@
     if (activeClue.clue.imageUrl) {
       panel.appendChild(el('div', { class: 'clue-image-wrap' }, [
         el('img', { class: 'clue-image', src: activeClue.clue.imageUrl, alt: 'Підказка' })
+      ]));
+    }
+    if (activeClue.clue.audioUrl) {
+      // autoplay is intentionally left off -- a sudden sound blast the
+      // instant a question opens (esp. on a shared TV/speaker) is worse UX
+      // than one extra tap; controls give players their own play/pause/seek.
+      panel.appendChild(el('div', { class: 'clue-audio-wrap' }, [
+        el('audio', { class: 'clue-audio', src: activeClue.clue.audioUrl, controls: 'controls', preload: 'auto' })
       ]));
     }
 
@@ -606,6 +618,66 @@
           ? ('На зв’язку: ' + (peerNames.length ? peerNames.join(', ') : 'поки тільки ви') + '. Чути тільки свою команду.')
           : 'Учасники вашої команди чують одне одного, коли мікрофон увімкнено. Іншу команду ви не чуєте ніколи.'
       ])
+    ]);
+  }
+
+  // ---------------- team music (dima's ask: each team can play its own
+  // background/thinking music) ----------------
+  // Same "local device, not streamed over the socket" model as the admin's
+  // host-music panel in admin.js -- whichever device opens this plays it
+  // from ITS OWN speakers, for whoever is physically near that screen (e.g.
+  // the one phone/laptop a team is huddled around). Deliberately not synced
+  // across a team's separate devices over the network -- see PROGRESS.md.
+  let teamMusicUrlDraft = '';
+  const teamYtHost = document.createElement('div');
+  teamYtHost.id = 'ytTeamMusicPlayer';
+  teamYtHost.style.cssText = 'position:absolute; width:1px; height:1px; visibility:hidden;';
+  document.body.appendChild(teamYtHost);
+  let teamYtPlayer = null;
+  let teamYtLoadedVideoId = null;
+  startMusicProgressTicker(() => teamYtPlayer, 'teamMusicFill', 'teamMusicLabel');
+
+  function playTeamMusicUrl(rawUrl) {
+    const id = extractYouTubeId(rawUrl);
+    if (!id) return toast('Не вдалося розпізнати посилання YouTube', true);
+    ensureYouTubeApi(() => {
+      if (!teamYtPlayer) {
+        teamYtLoadedVideoId = id;
+        teamYtPlayer = new YT.Player('ytTeamMusicPlayer', {
+          height: '1', width: '1', videoId: id,
+          playerVars: { autoplay: 1, controls: 0 },
+          events: { onReady: (e) => e.target.playVideo() }
+        });
+      } else if (id === teamYtLoadedVideoId) {
+        teamYtPlayer.playVideo(); // resume from the same paused position, no reload
+      } else {
+        teamYtLoadedVideoId = id;
+        teamYtPlayer.loadVideoById(id);
+        teamYtPlayer.playVideo();
+      }
+    });
+  }
+  function pauseTeamMusic() { if (teamYtPlayer && teamYtPlayer.pauseVideo) teamYtPlayer.pauseVideo(); }
+  function stopTeamMusic() { if (teamYtPlayer && teamYtPlayer.stopVideo) teamYtPlayer.stopVideo(); teamYtLoadedVideoId = null; }
+
+  function renderTeamMusicPanel() {
+    if (!myTeamId()) return null;
+    const urlInput = el('input', {
+      type: 'text', placeholder: 'Посилання на YouTube...', value: teamMusicUrlDraft,
+      oninput: (e) => { teamMusicUrlDraft = e.target.value; }
+    });
+    return el('div', { class: 'card', style: 'margin:14px 0; padding:14px 18px;' }, [
+      el('div', { class: 'row between' }, [el('strong', {}, ['\u{1F3B5} Музика команди'])]),
+      el('div', { class: 'field', style: 'margin-top:8px;' }, [urlInput]),
+      el('div', { class: 'row' }, [
+        el('button', { type: 'button', class: 'btn-small', onclick: () => playTeamMusicUrl(urlInput.value) }, ['▶ Грати']),
+        el('button', { type: 'button', class: 'btn-small btn-outline', onclick: pauseTeamMusic }, ['⏸ Пауза']),
+        el('button', { type: 'button', class: 'btn-small btn-outline crimson', onclick: stopTeamMusic }, ['■ Стоп'])
+      ]),
+      el('div', { class: 'timer-bar', style: 'margin-top:10px;' }, [el('div', { class: 'timer-bar-fill', id: 'teamMusicFill', style: 'background:var(--turquoise);' })]),
+      el('div', { id: 'teamMusicLabel', style: 'font-size:12px; font-weight:700; color:var(--turquoise-dark);' }, ['0:00 / 0:00']),
+      el('p', { style: 'font-size:12px; margin:6px 0 0; color:var(--turquoise-dark);' },
+        ['Грає з колонок цього пристрою -- тільки для вас/тих, хто поруч із цим екраном. Пауза зберігає позицію -- «Грати» продовжить з того ж місця.'])
     ]);
   }
 

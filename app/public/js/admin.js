@@ -256,6 +256,20 @@
           activeQ.accepted ? el('div', { style: 'font-size:12px; margin-top:4px; color:var(--turquoise-dark);' }, ['Також приймається: ' + activeQ.accepted.join(', ')]) : null
         ]));
       }
+      // Host sees the same picture/audio clue the players are looking at
+      // (real .siq-imported questions carry these) -- openedPayload.clue is
+      // the same forwarded whitelist player.js reads from.
+      const openedClue = r.activeQuestion.openedPayload && r.activeQuestion.openedPayload.clue;
+      if (openedClue && openedClue.imageUrl) {
+        parts.push(el('div', { class: 'clue-image-wrap' }, [
+          el('img', { class: 'clue-image', src: openedClue.imageUrl, alt: 'Підказка', style: 'max-height:220px;' })
+        ]));
+      }
+      if (openedClue && openedClue.audioUrl) {
+        parts.push(el('div', { class: 'clue-audio-wrap' }, [
+          el('audio', { class: 'clue-audio', src: openedClue.audioUrl, controls: 'controls', preload: 'auto' })
+        ]));
+      }
       parts.push(el('div', { style: 'margin-top:10px;' }, [
         el('button', { class: 'btn-crimson', onclick: () => socket.emit('admin:force_resolve_stuck', { roomCode: r.code }, (res) => { if (res.error) toast(res.error, true); }) }, ['Форсувати завершення (зависло)'])
       ]));
@@ -369,51 +383,35 @@
   document.body.appendChild(ytMusicHost);
 
   let ytPlayer = null;
-
-  function extractYouTubeId(input) {
-    if (!input) return null;
-    const trimmed = String(input).trim();
-    const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtu\.be\/)([A-Za-z0-9_-]{11})/,
-      /^([A-Za-z0-9_-]{11})$/
-    ];
-    for (const re of patterns) {
-      const m = trimmed.match(re);
-      if (m) return m[1];
-    }
-    return null;
-  }
-
-  function ensureYouTubeApi(cb) {
-    if (window.YT && window.YT.Player) return cb();
-    if (!document.getElementById('yt-iframe-api-script')) {
-      const tag = document.createElement('script');
-      tag.id = 'yt-iframe-api-script';
-      tag.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(tag);
-    }
-    const prevReady = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => { if (prevReady) { try { prevReady(); } catch (e) {} } cb(); };
-  }
+  let ytLoadedVideoId = null; // which video is currently loaded -- lets "Грати" tell "resume this" apart from "load a new track"
+  // extractYouTubeId/ensureYouTubeApi/formatPlayTime/startMusicProgressTicker now live in common.js (shared with player.js)
+  startMusicProgressTicker(() => ytPlayer, 'adminMusicFill', 'adminMusicLabel');
 
   function playYouTubeUrl(rawUrl) {
     const id = extractYouTubeId(rawUrl);
     if (!id) return toast('Не вдалося розпізнати посилання YouTube', true);
     ensureYouTubeApi(() => {
       if (!ytPlayer) {
+        ytLoadedVideoId = id;
         ytPlayer = new YT.Player('ytMusicPlayer', {
           height: '1', width: '1', videoId: id,
           playerVars: { autoplay: 1, controls: 0 },
           events: { onReady: (e) => e.target.playVideo() }
         });
+      } else if (id === ytLoadedVideoId) {
+        // Same track still loaded (e.g. hit "Грати" again after "Пауза") --
+        // just resume, do NOT reload, or it would restart from 0:00 instead
+        // of continuing from wherever it was paused (dima's ask).
+        ytPlayer.playVideo();
       } else {
+        ytLoadedVideoId = id;
         ytPlayer.loadVideoById(id);
         ytPlayer.playVideo();
       }
     });
   }
   function pauseYouTubeMusic() { if (ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo(); }
-  function stopYouTubeMusic() { if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo(); }
+  function stopYouTubeMusic() { if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo(); ytLoadedVideoId = null; }
 
   function renderMusicPanel() {
     const urlInput = el('input', {
@@ -428,8 +426,10 @@
         el('button', { type: 'button', class: 'btn-outline', onclick: pauseYouTubeMusic }, ['⏸ Пауза']),
         el('button', { type: 'button', class: 'btn-outline crimson', onclick: stopYouTubeMusic }, ['■ Стоп'])
       ]),
+      el('div', { class: 'timer-bar', style: 'margin-top:10px;' }, [el('div', { class: 'timer-bar-fill', id: 'adminMusicFill', style: 'background:var(--turquoise);' })]),
+      el('div', { id: 'adminMusicLabel', style: 'font-size:12px; font-weight:700; color:var(--turquoise-dark);' }, ['0:00 / 0:00']),
       el('p', { style: 'font-size:12px; color:var(--turquoise-dark); margin-top:6px;' },
-        ['Грає з колонок цього комп’ютера (ведучого) для всіх у кімнаті наживо -- не транслюється гравцям через мережу.'])
+        ['Грає з колонок цього комп’ютера (ведучого) для всіх у кімнаті наживо -- не транслюється гравцям через мережу. Пауза зберігає позицію -- «Грати» продовжить з того ж місця.'])
     ]);
   }
 

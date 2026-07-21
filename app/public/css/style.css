@@ -297,6 +297,14 @@ button.btn-small { padding: 7px 12px; font-size: 13px; }
   box-shadow: 0 6px 20px var(--shadow);
 }
 
+.clue-audio-wrap { margin-top: 14px; }
+.clue-audio {
+  width: 100%;
+  border-radius: 10px;
+  border: 2px solid var(--turquoise);
+  box-shadow: 0 6px 20px var(--shadow);
+}
+
 .logo-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

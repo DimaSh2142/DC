@@ -1,46 +1,63 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="DSGame — літери DS в колі, під ними Крампус">
-  <!-- DSGame brand mark. Palette: white / turquoise / crimson / orange only.
-       The Krampus figure uses a very dark shade of crimson (#2A0A10) as its
-       silhouette color: this is the same documented "shadow exception" the
-       site's own shadow/turquoise-ink tones use (a dark shade of an
-       existing hue, not a 5th color), per README "Про 4-колірну палітру".
-       See PROGRESS.md for the full design-decision writeup. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="DSGame — літери D і C, Крампус з бранкою на ланцюгу">
+  <!-- DSGame brand mark v2, drawn fresh for dima's "D+C block letters +
+       Krampus draped over them + small chained captive" concept (his own
+       reference sketch, redrawn here as original vector art rather than
+       traced/copied). Palette stays strict: white / turquoise / crimson /
+       orange, with the same documented dark "shadow" shade (#2A0A10) used
+       for the Krampus silhouette, chain and captive; not a 5th color, see
+       README "Про 4-колірну палітру". favicon.svg is untouched: it already
+       isolates just the horns/eyes/fangs (same paths, reused below), which
+       is still the boldest legible chunk at 16-32px. -->
   <circle cx="100" cy="100" r="93" fill="#FFFFFF" stroke="#9C1B2C" stroke-width="11"/>
   <circle cx="100" cy="100" r="80" fill="none" stroke="#17B8A6" stroke-width="3"/>
 
-  <text x="100" y="66" font-family="Poppins, 'Segoe UI', Arial, sans-serif" font-weight="800" font-size="46" text-anchor="middle" fill="#0B3D38" letter-spacing="1">DS</text>
+  <!-- Block letter D (crimson), left half of the badge -->
+  <path d="M30,58 L66,58 C95,58 110,78 110,102 C110,126 95,148 66,148 L30,148 Z" fill="#D7263D"/>
+  <path d="M48,76 L64,76 C80,76 88,88 88,103 C88,118 80,130 64,130 L48,130 Z" fill="#FFFFFF"/>
 
-  <g id="krampus" stroke="#F2994A" stroke-width="0.7" stroke-linejoin="round">
-    <!-- horns, ridged, behind head -->
+  <!-- Block letter C (turquoise), right half of the badge, ring with a
+       right-facing gap so it reads as "C" next to the "D" -->
+  <path d="M168,103 A33,33 0 1,0 102,103 A33,33 0 1,0 168,103 M152,103 A17,17 0 1,0 118,103 A17,17 0 1,0 152,103"
+        fill-rule="evenodd" fill="#17B8A6"/>
+  <path d="M135,103 L171,86 L171,120 Z" fill="#FFFFFF"/>
+
+  <!-- Krampus head, horns, eyes and fangs draped over the D/C seam;
+       identical path shapes to the original mark (just scaled 0.5x and
+       recentered), so favicon.svg (which reuses the full-size versions of
+       these same paths) still matches the family look. -->
+  <g transform="translate(50,-20) scale(0.5)" stroke="#F2994A" stroke-width="0.7" stroke-linejoin="round">
     <path d="M116,112 C122,98 130,80 148,68 C152,66 154,70 150,76 L143,84 L149,86 C138,90 130,100 128,114 C124,116 118,116 116,112 Z" fill="#2A0A10"/>
     <path d="M84,112 C78,98 70,80 52,68 C48,66 46,70 50,76 L57,84 L51,86 C62,90 70,100 72,114 C76,116 82,116 84,112 Z" fill="#2A0A10"/>
-
-    <!-- shoulders / fur mantle, jagged top edge, behind head -->
-    <path d="M60,166 C46,171 38,178 40,183 L160,183 C162,178 154,171 140,166 L128,172 L122,164 C114,177 100,180 100,180 C100,180 86,177 78,164 L72,172 Z" fill="#2A0A10"/>
-
-    <!-- angular jagged head, deliberately not smooth/cute -->
     <path d="M100,94 L66,104 L58,122 L52,130 L64,140 L84,158 L100,176 L116,158 L136,140 L148,130 L142,122 L134,104 Z" fill="#2A0A10"/>
-
-    <!-- small pointed ears -->
     <path d="M58,118 L46,122 L60,132 Z" fill="#2A0A10"/>
     <path d="M142,118 L154,122 L140,132 Z" fill="#2A0A10"/>
-
-    <!-- heavy angry brow, overlapping eyes -->
     <path d="M62,118 L91,109 L90,120 L67,127 Z" fill="#2A0A10"/>
     <path d="M138,118 L109,109 L110,120 L133,127 Z" fill="#2A0A10"/>
-
-    <!-- glowing goat eyes: outer glow + horizontal slit pupil -->
     <ellipse cx="77" cy="130" rx="9.5" ry="4.5" fill="#F2994A" stroke="none"/>
     <ellipse cx="123" cy="130" rx="9.5" ry="4.5" fill="#F2994A" stroke="none"/>
     <ellipse cx="77" cy="130" rx="6.5" ry="1.4" fill="#2A0A10" stroke="none"/>
     <ellipse cx="123" cy="130" rx="6.5" ry="1.4" fill="#2A0A10" stroke="none"/>
-
-    <!-- mouth cavity -->
     <path d="M79,145 C87,155 113,155 121,145 C116,159 84,159 79,145 Z" fill="#9C1B2C" stroke="none"/>
-    <!-- bared, irregular teeth -->
     <path d="M81,146 L86,154 L90,145 L95,152 L100,144 L105,152 L110,145 L114,154 L119,146" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-    <!-- long fangs -->
     <path d="M79,145 L72,161 L84,147 Z" fill="#FFFFFF" stroke="none"/>
     <path d="M121,145 L128,161 L116,147 Z" fill="#FFFFFF" stroke="none"/>
   </g>
+
+  <!-- Arms draping down from behind the head onto the top of each letter,
+       ending in small clawed hands; this is the "draped through the
+       letters" read, done as thick round-capped strokes (robust/simple
+       rather than a fragile hand-fit silhouette). -->
+  <path d="M80,64 C64,70 46,82 38,102" fill="none" stroke="#2A0A10" stroke-width="13" stroke-linecap="round"/>
+  <path d="M38,102 L24,96 M38,102 L20,106 M38,102 L26,118" stroke="#2A0A10" stroke-width="5" stroke-linecap="round" fill="none"/>
+  <path d="M120,64 C136,70 154,82 162,102" fill="none" stroke="#2A0A10" stroke-width="13" stroke-linecap="round"/>
+  <path d="M162,102 L176,96 M162,102 L180,106 M162,102 L174,118" stroke="#2A0A10" stroke-width="5" stroke-linecap="round" fill="none"/>
+
+  <!-- Small chained captive dangling from the right claw, over the C, per
+       dima's reference concept; kept compact and in the same dark
+       silhouette color so it reads as part of one cohesive illustration. -->
+  <path d="M162,104 L167,111 L157,117 L166,123 L157,129" fill="none" stroke="#2A0A10" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="157" cy="134" r="5" fill="#2A0A10"/>
+  <path d="M152,138 L162,138 L160,150 L154,150 Z" fill="#2A0A10"/>
+  <path d="M152,140 L146,148 M162,140 L168,148" stroke="#2A0A10" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M155,150 L152,159 M159,150 L162,159" stroke="#2A0A10" stroke-width="2.5" stroke-linecap="round"/>
 </svg>
