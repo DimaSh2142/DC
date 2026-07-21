@@ -273,8 +273,8 @@
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth.token },
       body: JSON.stringify({ nickname: targetNickname, amount })
     }).then(({ status, data }) => {
-      if (status !== 200) return toast((data && data.error) || 'Не вдалося видати ККоїни', true);
-      toast('Видано ' + amount + ' ККоїн гравцю ' + targetNickname + ' (баланс: ' + data.profile.kkoin + ')');
+      if (status !== 200) return toast((data && data.error) || 'Не вдалося видати KKrampus coin', true);
+      toast('Видано ' + amount + ' KKrampus coin гравцю ' + targetNickname + ' (баланс: ' + data.profile.kkoin + ')');
       grantNicknameInput.value = '';
       grantAmountInput.value = '';
       // Granting to yourself should show up on your own visible balance too.
@@ -388,20 +388,20 @@
     }).catch(() => toast('Не вдалося з’єднатися із сервером', true));
   });
 
-  // ---- "Як отримати більше Крампус коїнів" (2026-07-21, dima's "+" button) ----
+  // ---- "Як отримати більше KKrampus coin" (2026-07-21, dima's "+" button) ----
   kkoinAddBtn.addEventListener('click', openEarnMenu);
 
   function openEarnMenu() {
     const level = (profile && profile.bubbleLevel) || 1;
-    openModal('Як отримати більше Крампус коїнів', [
+    openModal('Як отримати більше KKrampus coin', [
       el('div', { class: 'stack' }, [
         el('button', { type: 'button', class: 'earn-menu-btn', onclick: openSubmitPackModal }, [
           el('span', { class: 'earn-menu-btn-title' }, ['📦 Закинь українізовану SiGame']),
-          el('span', { class: 'earn-menu-btn-sub' }, ['Надішли свій .siq файл — одразу +20 ККоїн на баланс'])
+          el('span', { class: 'earn-menu-btn-sub' }, ['Надішли свій .siq файл — одразу +20 KKrampus coin на баланс'])
         ]),
         el('button', { type: 'button', class: 'earn-menu-btn btn-outline', onclick: () => { window.location.href = '/bubbles.html'; } }, [
           el('span', { class: 'earn-menu-btn-title' }, ['🫧 Пройти міні-гру «Бульбашки»']),
-          el('span', { class: 'earn-menu-btn-sub' }, ['Твій рівень: ' + level + ' — +2 ККоїн за кожен пройдений рівень, далі складніше'])
+          el('span', { class: 'earn-menu-btn-sub' }, ['Твій рівень: ' + level + ' — +2 KKrampus coin за кожен пройдений рівень, далі складніше'])
         ]),
         el('button', { type: 'button', class: 'earn-menu-btn btn-outline orange', onclick: openTopupModal }, [
           el('span', { class: 'earn-menu-btn-title' }, ['⚡ Поповнити моментально']),
@@ -431,9 +431,9 @@
       }
     });
     const pickBtn = el('button', { type: 'button', class: 'btn-outline', onclick: () => fileInput.click() }, ['Обрати .siq файл']);
-    const submitBtn = el('button', { type: 'button', onclick: () => submitPack(pendingFile, submitBtn) }, ['Надіслати й отримати +20 ККоїн']);
+    const submitBtn = el('button', { type: 'button', onclick: () => submitPack(pendingFile, submitBtn) }, ['Надіслати й отримати +20 KKrampus coin']);
     openModal('Закинь українізовану SiGame', [
-      el('p', {}, ['Обери свій українізований .siq файл (пак SiGame). Дима перегляне його й додасть у банк тем — а тобі одразу нарахується 20 ККоїн на баланс.']),
+      el('p', {}, ['Обери свій українізований .siq файл (пак SiGame). Дима перегляне його й додасть у банк тем — а тобі одразу нарахується 20 KKrampus coin на баланс.']),
       pickBtn, fileInput, fileLabel,
       el('div', { class: 'stack', style: 'margin-top:14px;' }, [submitBtn])
     ]);
@@ -451,16 +451,16 @@
     })).then(({ status, data }) => {
       if (status !== 200 || data.error) {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Надіслати й отримати +20 ККоїн';
+        submitBtn.textContent = 'Надіслати й отримати +20 KKrampus coin';
         return toast((data && data.error) || 'Не вдалося надіслати файл', true);
       }
       profile = data.profile;
       renderProfile();
       closeModal();
-      toast('Дякуємо! Нараховано +' + data.awarded + ' ККоїн 🪙');
+      toast('Дякуємо! Нараховано +' + data.awarded + ' KKrampus coin 🪙');
     }).catch(() => {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Надіслати й отримати +20 ККоїн';
+      submitBtn.textContent = 'Надіслати й отримати +20 KKrampus coin';
       toast('Не вдалося з’єднатися із сервером', true);
     });
   }

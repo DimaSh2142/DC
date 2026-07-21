@@ -567,8 +567,8 @@
       wrap.appendChild(el('div', { class: 'kkoin-panel', style: 'margin-top:14px;' }, [
         el('div', { class: 'kkoin-emoji' }, ['\u{1FA99}']),
         el('div', { style: 'min-width:0;' }, [
-          el('div', { class: 'kkoin-amount' }, ['+' + roomState.kkoinAward.perPlayer + ' ККоїн']),
-          el('div', { class: 'kkoin-label' }, ['Команда-переможець (' + roomState.kkoinAward.teamNames.join(', ') + ') отримує ККоїни -- нарахування вже на балансі кожного учасника в особистому кабінеті.'])
+          el('div', { class: 'kkoin-amount' }, ['+' + roomState.kkoinAward.perPlayer + ' KKrampus coin']),
+          el('div', { class: 'kkoin-label' }, ['Команда-переможець (' + roomState.kkoinAward.teamNames.join(', ') + ') отримує KKrampus coin -- нарахування вже на балансі кожного учасника в особистому кабінеті.'])
         ])
       ]));
     }

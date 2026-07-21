@@ -289,7 +289,7 @@
       playSfx('select');
       showOverlay(
         atCap ? '🏆 Максимальний рівень!' : ('🎉 Рівень ' + currentLevel + ' пройдено!'),
-        atCap ? ('+' + data.awarded + ' ККоїн — ти вже на межі складності (' + MAX_LEVEL + '), можна грати далі на коіни') : ('+' + data.awarded + ' ККоїн — далі складніше'),
+        atCap ? ('+' + data.awarded + ' KKrampus coin — ти вже на межі складності (' + MAX_LEVEL + '), можна грати далі на них') : ('+' + data.awarded + ' KKrampus coin — далі складніше'),
         atCap ? 'Грати ще раз' : 'Наступний рівень',
         () => startLevel(nextLevelNum),
         true

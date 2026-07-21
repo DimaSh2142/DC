@@ -40,7 +40,7 @@ function setMicVolume(v) { localStorage.setItem(SETTINGS_KEYS.micVolume, String(
 // an optional token+role remembered client-side after a successful
 // login/registration in Особистий кабінет (see profile.js). Read by quiz.js
 // (to decide whether to show the "Адмін-панель" button) and profile.js (to
-// decide whether to show the admin-only "видати ККоїни" panel). NOT itself a
+// decide whether to show the admin-only "видати KKrampus coin" panel). NOT itself a
 // security boundary -- the server independently re-checks the token/role on
 // every protected request (see authSessions.js's requireAdmin), so worst
 // case a stale/tampered value here just shows or hides a button wrongly for

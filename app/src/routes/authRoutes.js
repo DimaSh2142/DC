@@ -58,7 +58,7 @@ function buildAuthRouter() {
     const trimmed = String(nickname || '').trim();
     const n = Number(amount);
     if (!trimmed) return res.status(400).json({ error: 'Вкажіть нікнейм гравця' });
-    if (!Number.isFinite(n) || n === 0) return res.status(400).json({ error: 'Вкажіть ненульову кількість ККоїнів' });
+    if (!Number.isFinite(n) || n === 0) return res.status(400).json({ error: 'Вкажіть ненульову кількість KKrampus coin' });
     const profile = playersStore.addKkoin(trimmed, n);
     res.json({ ok: true, profile });
   });

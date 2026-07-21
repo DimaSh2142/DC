@@ -844,25 +844,9 @@ input[type="range"] {
   from { transform: translateY(-10%) translateX(0); }
   to { transform: translateY(480%) translateX(12px); }
 }
+/* .casino-coin (старий емодзі-в-колі) прибраний 2026-07-21 -- замінений
+   справжньою 3D-монетою .kcoin (див. секцію "KKrampus coin" нижче у файлі). */
 .casino-coin-wrap { margin: 6px 0 12px; }
-.casino-coin {
-  width: 84px;
-  height: 84px;
-  margin: 0 auto;
-  border-radius: 50%;
-  border: 5px solid var(--orange);
-  background: linear-gradient(180deg, var(--crimson) 0%, #0B1917 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 38px;
-  box-shadow: 0 0 26px rgba(242, 153, 74, 0.45);
-  animation: casino-coin-spin 9s linear infinite;
-}
-@keyframes casino-coin-spin {
-  from { transform: rotateY(0deg); }
-  to { transform: rotateY(360deg); }
-}
 .casino-title { font-size: 28px; margin: 4px 0 6px; }
 .casino-accent-gold { color: var(--orange); }
 .casino-tagline { color: var(--turquoise-light); font-size: 14px; margin: 0 0 16px; }
@@ -877,7 +861,6 @@ input[type="range"] {
   font-weight: 800;
   font-size: 17px;
 }
-.casino-kkoin-emoji { font-size: 20px; }
 .casino-kkoin-label { font-weight: 600; font-size: 12px; color: var(--turquoise-light); }
 .casino-body { padding: 22px 24px 0; text-align: center; }
 
@@ -1237,3 +1220,31 @@ input[type="range"] {
 .ds-page .tabs button.active { background: var(--ds-mint); color: #04140D; border-color: var(--ds-mint); }
 .ds-page .locked-banner { background: rgba(215,38,61,.12); border: 1.5px solid rgba(215,38,61,.4); color: #ff8b98; }
 .ds-page .admin-grant-panel-note { color: var(--ds-text-dim); }
+
+/* ============================================================================
+   KKrampus coin -- справжня 3D монета-переверталка (2026-07-21, dima дав
+   вихідний код React-компонента KrampusCoin.jsx з base44-сайту, адаптовано
+   тут у чистий HTML/CSS, бо в цьому проєкті немає React). Той самий підхід,
+   що в оригіналі: perspective + transform-style:preserve-3d на контейнері,
+   і дві сторони з backface-visibility:hidden -- лицьова показує РЕАЛЬНЕ
+   зображення монети (те саме generated_image, яке dima надіслав посиланням
+   у коді, тепер збережене локально як /img/kkrampus-coin.jpg), зворотна
+   показує "KK" -- ті самі кольори золотого обідка й бурштиновий glow, що й
+   у наданому компоненті. Розмір задається інлайновим style
+   (width/height) на .kcoin, як у оригінальному пропсі size={64}. ============ */
+.kcoin { position: relative; display: inline-block; perspective: 800px; flex-shrink: 0; }
+.kcoin-glow { position: absolute; inset: -20%; border-radius: 50%; background: rgba(245, 158, 11, .35); filter: blur(14px); z-index: 0; }
+.kcoin-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; animation: kcoin-spin 3.6s linear infinite; }
+.kcoin-face, .kcoin-back {
+  position: absolute; inset: 0; border-radius: 50%;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 50%, #fde68a, #f59e0b 55%, #92400e 100%);
+  box-shadow: inset 0 2px 4px rgba(255,255,255,.5), inset 0 -3px 6px rgba(120,53,15,.6), 0 4px 12px rgba(0,0,0,.4);
+}
+.kcoin-face img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.kcoin-back { transform: rotateY(180deg); }
+.kcoin-back span { font-weight: 900; color: #78350f; line-height: 1; }
+@keyframes kcoin-spin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+@media (prefers-reduced-motion: reduce) { .kcoin-inner { animation: none; } }

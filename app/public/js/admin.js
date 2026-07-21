@@ -324,7 +324,7 @@
       box.appendChild(el('div', { class: 'kkoin-panel', style: 'margin-top:12px;' }, [
         el('div', { class: 'kkoin-emoji' }, ['\u{1FA99}']),
         el('div', {}, [
-          el('div', { class: 'kkoin-amount' }, ['+' + r.kkoinAward.perPlayer + ' ККоїн кожному']),
+          el('div', { class: 'kkoin-amount' }, ['+' + r.kkoinAward.perPlayer + ' KKrampus coin кожному']),
           el('div', { class: 'kkoin-label' }, ['Команда-переможець: ' + r.kkoinAward.teamNames.join(', ')])
         ])
       ]));
