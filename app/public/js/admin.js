@@ -176,7 +176,7 @@
     ]);
     app.appendChild(el('div', { class: 'center-screen', style: 'min-height:80vh;' }, [
       el('div', { class: 'card', style: 'max-width:380px; width:100%;' }, [
-        el('img', { src: '/img/logo.svg', alt: 'DSGame', style: 'display:block; width:84px; height:84px; margin:0 auto 10px;' }),
+        el('img', { src: '/img/logo.jpg', alt: 'DSGame', style: 'display:block; width:100px; height:auto; margin:0 auto 10px;' }),
         el('h2', { style: 'text-align:center;' }, ['Адмін-панель DSGame']),
         form
       ])
@@ -187,7 +187,7 @@
     const wrap = el('div', {}, []);
     wrap.appendChild(el('div', { class: 'row between' }, [
       el('div', { class: 'row', style: 'align-items:center; gap:10px;' }, [
-        el('img', { src: '/img/logo.svg', alt: 'DSGame', style: 'width:36px; height:36px;' }),
+        el('img', { src: '/img/logo.jpg', alt: 'DSGame', style: 'width:40px; height:auto;' }),
         el('h2', {}, ['Адмін-панель'])
       ]),
       el('button', { class: 'btn-outline', onclick: createRoom }, ['+ Нова кімната'])

@@ -203,7 +203,7 @@
 
     app.appendChild(el('div', { class: 'center-screen', style: 'min-height:80vh;' }, [
       el('div', { class: 'card', style: 'max-width:420px; width:100%;' }, [
-        el('img', { src: '/img/logo.svg', alt: 'DSGame', class: 'brand-logo', style: 'display:block; width:96px; height:96px; margin:0 auto 10px;' }),
+        el('img', { src: '/img/logo.jpg', alt: 'DSGame', class: 'brand-logo', style: 'display:block; width:110px; height:auto; margin:0 auto 10px;' }),
         el('h1', { class: 'brand-title', style: 'text-align:center; font-size:26px;' }, ['DS', el('span', { class: 'accent' }, ['Game'])]),
         form
       ])
