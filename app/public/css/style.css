@@ -571,8 +571,11 @@ th { color: var(--turquoise-dark); }
   text-align: center;
   user-select: none;
   overflow-x: hidden;
+  /* dima 2026-07-22: гало за заголовком тепер magenta (rgba(199,21,133,...)),
+     не turquoise -- у реальному base44-експорті (Hero.jsx) саме таке гало
+     сидить точно за словом "DSLand". */
   background:
-    radial-gradient(ellipse 900px 500px at 50% -10%, rgba(23, 184, 166, 0.16), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 50% -10%, rgba(199, 21, 133, 0.16), transparent 60%),
     var(--hub-obsidian);
   color: var(--hub-text);
 }
@@ -624,22 +627,38 @@ th { color: var(--turquoise-dark); }
 .hub-cabinet-btn:hover { transform: translateY(-2px); border-color: var(--turquoise); box-shadow: 0 8px 26px rgba(23,184,166,.25); }
 .hub-cabinet-btn-icon { font-size: 16px; }
 
-/* hero: neon gradient "DSLand" wordmark (лого прибрано з hero за проханням
-   dima 2026-07-21 -- логотип-картинка лишається у фавіконці й на самій
-   вікторині quiz.html, тут тепер лише текст, як у скріні-референсі). */
+/* hero: "DSLand" wordmark (лого прибрано з hero за проханням dima 2026-07-21
+   -- логотип-картинка лишається у фавіконці й на самій вікторині quiz.html,
+   тут тепер лише текст). Кольори dima 2026-07-22 звірені 1-в-1 з реальним
+   base44-експортом (Дизайн сайту/components/game/Hero.jsx): D і S -- окремі
+   суцільні кольори (червоний/синій), НЕ спільний turquoise->orange градієнт
+   як було раніше -- в оригіналі взагалі немає жовтогарячого чи бірюзового в
+   вордмарці. "Land" -- градієнт magenta->pink, теж з оригіналу. */
 .hub-hero { position: relative; z-index: 2; margin-top: 40px; display: flex; flex-direction: column; align-items: center; }
+.hub-eyebrow {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase;
+  color: #00FFD1;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  margin-bottom: 10px;
+}
+.hub-eyebrow-line { width: 32px; height: 1px; background: #00FFD1; display: inline-block; }
 .hub-title-neon {
   margin: 0;
   font-weight: 900;
   letter-spacing: .5px;
   font-size: 68px;
   line-height: 1.05;
-  background: linear-gradient(90deg, var(--turquoise) 0%, var(--white) 50%, var(--orange) 100%);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 0 26px rgba(23,184,166,.45)) drop-shadow(0 0 46px rgba(242,153,74,.25));
 }
+/* .letter-d/.letter-s кольори (окремо) без глоу-тіні -- використовуються і в
+   hero (68px, з глоу нижче), і в маленькій вордмарці футера (18px, без
+   глоу -- на такому розмірі 40px blur виглядав би просто плямою). */
+.letter-d { color: #FF2D2D; }
+.letter-s { color: #3B82F6; }
+.hub-title-neon .letter-d { filter: drop-shadow(0 0 40px rgba(255,45,45,.35)); }
+.hub-title-neon .letter-s { filter: drop-shadow(0 0 40px rgba(59,130,246,.35)); }
 .hub-title-neon .accent-neon {
-  background: linear-gradient(90deg, var(--crimson) 0%, var(--orange) 100%);
+  background: linear-gradient(90deg, #C71585 0%, #FF4FA3 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .hub-page .hub-tagline { color: var(--hub-text-dim); margin: 10px 0 0; font-size: 16px; font-weight: 500; }
@@ -668,18 +687,38 @@ th { color: var(--turquoise-dark); }
 .hub-card-play { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; letter-spacing: .5px; padding: 8px 16px; border-radius: 99rem; background: rgba(255,255,255,.06); }
 .hub-card-play .arrow { transition: transform .2s ease; }
 .hub-card:hover .hub-card-play .arrow { transform: translateX(4px); }
-.hub-card-turquoise { border-color: rgba(23,184,166,.4); }
-.hub-card-turquoise:hover { border-color: var(--turquoise); box-shadow: 0 18px 40px rgba(23,184,166,.28); }
-.hub-card-turquoise .hub-card-play { color: var(--turquoise); background: rgba(23,184,166,.14); }
-.hub-card-crimson { border-color: rgba(215,38,61,.4); }
-.hub-card-crimson:hover { border-color: var(--crimson); box-shadow: 0 18px 40px rgba(215,38,61,.28); }
-.hub-card-crimson .hub-card-play { color: #ff8b98; background: rgba(215,38,61,.14); }
-.hub-card-orange { border-color: rgba(242,153,74,.4); }
-.hub-card-orange:hover { border-color: var(--orange); box-shadow: 0 18px 40px rgba(242,153,74,.28); }
-.hub-card-orange .hub-card-play { color: var(--orange); background: rgba(242,153,74,.14); }
+/* dima 2026-07-22: точні акцентні кольори кожної картки звірені з реальним
+   base44-експортом (components/game/GameCard.jsx -- масив GAMES). Назви
+   класів (crimson/orange/turquoise) лишились як історичні ідентифікатори
+   карток 1/2/3, самі кольори тепер точні hex з референсу, а не наші
+   сайтові --crimson/--orange/--turquoise токени (які й далі окремо
+   використовуються по всьому іншому сайту -- тут навмисно НЕ займали). */
+.hub-card-crimson { border-color: rgba(199,21,133,.4); }
+.hub-card-crimson:hover { border-color: #C71585; box-shadow: 0 18px 40px rgba(199,21,133,.28); }
+.hub-card-crimson .hub-card-play { color: #ff6fc4; background: rgba(199,21,133,.14); }
+.hub-card-orange { border-color: rgba(218,165,32,.4); }
+.hub-card-orange:hover { border-color: #DAA520; box-shadow: 0 18px 40px rgba(218,165,32,.28); }
+.hub-card-orange .hub-card-play { color: #DAA520; background: rgba(218,165,32,.14); }
+.hub-card-turquoise { border-color: rgba(32,178,170,.4); }
+.hub-card-turquoise:hover { border-color: #20B2AA; box-shadow: 0 18px 40px rgba(32,178,170,.28); }
+.hub-card-turquoise .hub-card-play { color: #20B2AA; background: rgba(32,178,170,.14); }
 
 /* footer: ONLINE status + live UTC clock (see /js/hub.js) */
 .hub-footer { position: relative; z-index: 2; margin-top: 46px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+/* dima 2026-07-22: маленький повтор вордмарки у футері -- як у реальному
+   base44-експорті (components/game/Footer.jsx): ті самі D/S кольори, але
+   "Land" тут суцільним magenta, без градієнта (в оригіналі так само). */
+.hub-footer-brand {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 18px; font-weight: 800; letter-spacing: -.02em;
+}
+.hub-footer-brand .hub-footer-land { color: #C71585; }
+.hub-footer-divider { width: 1px; height: 14px; background: rgba(234,246,244,.15); display: inline-block; }
+.hub-footer-tag {
+  font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  color: var(--hub-text-dim);
+}
 .hub-footer-status { font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--hub-text-dim); display: inline-flex; align-items: center; gap: 6px; }
 .hub-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #3DDC97; box-shadow: 0 0 8px #3DDC97; animation: hub-pulse 1.8s ease-in-out infinite; }
 @keyframes hub-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
