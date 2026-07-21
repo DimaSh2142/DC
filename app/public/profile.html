@@ -10,17 +10,21 @@
 <body>
   <div class="center-screen">
     <div class="card" style="max-width:520px; width:100%;">
-      <a href="/" class="back-link">← На головну</a>
+      <a href="/" class="back-link" id="cabinet-back-link">← На головну</a>
       <h1 style="margin-top:0;">Особистий кабінет</h1>
 
       <div id="gate-section">
-        <p style="color:var(--turquoise-dark);">Введіть свій нікнейм (той самий, під яким граєте у вікторині), щоб відкрити кабінет.</p>
+        <p style="color:var(--turquoise-dark);">Введіть свій нікнейм (той самий, під яким граєте у вікторині), щоб відкрити кабінет. Пароль потрібен лише якщо хочеш власний акаунт (щоб ніхто інший не міг зайти під твоїм нікнеймом) — можна лишити порожнім і просто грати.</p>
         <form id="gate-form" class="stack">
           <div class="field" style="margin-bottom:10px;">
             <label for="gate-nickname">Нікнейм</label>
             <input type="text" id="gate-nickname" maxlength="24" placeholder="Наприклад, Dima" autocomplete="off">
           </div>
-          <button type="submit">Відкрити кабінет</button>
+          <div class="field" style="margin-bottom:10px;">
+            <label for="gate-password">Пароль (необов'язково)</label>
+            <input type="password" id="gate-password" maxlength="72" placeholder="Залиш порожнім, щоб зайти без акаунту">
+          </div>
+          <button type="submit" id="gate-submit-btn">Зберегти</button>
         </form>
       </div>
 
@@ -30,10 +34,13 @@
         </div>
 
         <div class="row" style="align-items:center; gap:16px; margin-bottom:8px; flex-wrap:nowrap;">
-          <div class="avatar-picker" id="avatar-picker">
-            <div class="avatar-picker-preview" id="avatar-preview-wrap"></div>
-            <div class="avatar-picker-label" id="avatar-picker-label">Змінити фото</div>
-            <input type="file" id="avatar-file-input" accept="image/*" style="display:none;">
+          <div>
+            <div class="avatar-picker" id="avatar-picker">
+              <div class="avatar-picker-preview" id="avatar-preview-wrap"></div>
+              <div class="avatar-picker-label" id="avatar-picker-label">Змінити фото</div>
+              <input type="file" id="avatar-file-input" accept="image/*" style="display:none;">
+            </div>
+            <button type="button" id="avatar-preset-btn" class="btn-small btn-outline" style="margin-top:6px; width:100%;">Готові аватарки</button>
           </div>
           <div style="flex:1; min-width:0;">
             <label for="nickname-input">Нікнейм</label>
@@ -43,12 +50,14 @@
         <div class="row" style="margin-bottom:22px;">
           <button type="button" id="save-nickname-btn" class="btn-small">Зберегти нікнейм</button>
           <button type="button" id="switch-profile-btn" class="btn-small btn-outline">Інший нікнейм</button>
+          <button type="button" id="logout-btn" class="btn-small btn-outline crimson" style="display:none;">Вийти з акаунту</button>
         </div>
 
         <div class="row" style="margin-bottom:20px; flex-wrap:wrap; gap:8px;">
           <span class="badge outline">✅ Правильних: <span id="stat-correct">0</span></span>
           <span class="badge outline">❌ Неправильних: <span id="stat-incorrect">0</span></span>
           <span class="badge outline">🎮 Ігор зіграно: <span id="stat-games">0</span></span>
+          <span class="badge outline" id="account-badge"></span>
         </div>
 
         <div class="kkoin-panel">
@@ -66,6 +75,17 @@
           </div>
           <div id="items-empty" class="items-empty">Поки що порожньо. Тут будуть з'являтися речі, які випадуть із кейсів у Казино.</div>
           <div id="items-list" class="items-list"></div>
+        </div>
+
+        <div class="items-panel" id="admin-grant-panel" style="display:none;">
+          <div class="row between" style="align-items:center; margin-bottom:10px;">
+            <h2 style="margin:0;">🛡️ Видати ККоїни (адмін)</h2>
+          </div>
+          <div class="row" style="gap:8px; flex-wrap:wrap;">
+            <input type="text" id="grant-nickname" placeholder="Нікнейм гравця" style="flex:1; min-width:140px;">
+            <input type="number" id="grant-amount" placeholder="Кількість" style="width:110px;">
+            <button type="button" id="grant-kkoin-btn" class="btn-small">Видати</button>
+          </div>
         </div>
 
         <h2 style="margin-bottom:10px;">Налаштування</h2>

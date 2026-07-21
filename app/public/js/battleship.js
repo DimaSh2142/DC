@@ -158,7 +158,10 @@
           disabled: usable ? null : 'disabled',
           onclick: () => {
             if (!usable) return; // belt-and-suspenders, same pattern as player.js's board cells
-            socket.emit('mg:battleship_fire', { x, y }, (res) => { if (res.error) toast(res.error, true); });
+            socket.emit('mg:battleship_fire', { x, y }, (res) => {
+              if (res.error) { toast(res.error, true); return; }
+              playSfx(res.hit ? 'impact' : 'move');
+            });
           }
         }, [label]));
       }

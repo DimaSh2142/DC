@@ -54,6 +54,7 @@ function applyMove(state, playerIdx, from, to, promotion) {
   return {
     ok: true,
     san: move.san,
+    captured: !!move.captured, // chess.js's own move object -- piece-type letter if this move captured, undefined otherwise (used client-side to pick a capture vs. plain-move sound, see chess.js public/js client)
     check: chess.isCheck(),
     checkmate: chess.isCheckmate(),
     winnerIdx: state.winnerIdx,

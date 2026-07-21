@@ -22,7 +22,7 @@
   // broadcasts (any player joining/answering causes one) so that an admin
   // mid-keystroke in these fields doesn't see their input silently reset to
   // the hardcoded default -- see PROGRESS.md "known limitation" note.
-  const controlsDraft = { numTeams: 3, numRounds: 2, perRound: 5 };
+  const controlsDraft = { numTeams: 2, numRounds: 2, perRound: 5 }; // dima 2026-07-21: дефолт 2 команди, а не 3
   const teamNameDrafts = {}; // teamId -> in-progress typed name (same purpose as controlsDraft)
 
   const TEAM_COLOR_CLASS = {

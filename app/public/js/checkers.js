@@ -63,6 +63,7 @@
             if (isDest) {
               socket.emit('mg:checkers_move', { from: selected, to: [ar, ac] }, (res) => {
                 if (res.error) { toast(res.error, true); return; }
+                playSfx(res.captured ? 'impact' : 'move');
                 selected = res.continueJump ? [ar, ac] : null;
                 render();
               });

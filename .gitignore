@@ -7,6 +7,10 @@ app/.env
 # runtime state — recreated automatically on first run, not source
 app/data/players.json
 app/data/usedThemes.json
+# accounts.json holds password hashes (never plaintext, see accountsStore.js)
+# but still shouldn't sit in a public repo -- recreated fresh (re-seeding the
+# DimaSh admin account) on first server start, same as the two files above
+app/data/accounts.json
 
 # user-submitted SiGame packs ("Закинь українізовану SiGame" button) — may
 # contain copyrighted third-party media, same reasoning as reference/ below;

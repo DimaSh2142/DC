@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const config = require('./src/config');
 const { buildAdminRouter } = require('./src/routes/adminRoutes');
 const { buildProfileRouter } = require('./src/routes/profileRoutes');
+const { buildAuthRouter } = require('./src/routes/authRoutes');
 const { registerSocketHandlers } = require('./src/socket/socketHandlers');
 const { registerMiniGameHandlers } = require('./src/socket/miniGameHandlers');
 const { RoomManager } = require('./src/state/roomManager');
@@ -24,6 +25,7 @@ app.use(express.json({ limit: '25mb' })); // raised from express' 100kb default 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/admin', buildAdminRouter());
 app.use('/api/profile', buildProfileRouter(roomManager));
+app.use('/api/auth', buildAuthRouter());
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 

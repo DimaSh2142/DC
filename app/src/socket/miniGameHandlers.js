@@ -147,7 +147,7 @@ function registerMiniGameHandlers(io, { miniGameManager }) {
       if (result.error) return cb && cb({ error: result.error });
       miniGameManager.applyModuleResult(room, result);
       broadcastRoomState(room);
-      if (cb) cb({ ok: true });
+      if (cb) cb({ ok: true, captured: result.captured });
     }));
 
     // ---------- shared ----------

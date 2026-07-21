@@ -541,6 +541,7 @@
     if (finishedConfettiFiredFor !== roomState.code) {
       finishedConfettiFiredFor = roomState.code;
       confettiBurst(140);
+      playSfx('select');
     }
     const wrap = el('div', {}, [
       el('h2', {}, ['Гру завершено!']),
@@ -925,7 +926,7 @@
     lastResult = result;
     stopTimer();
     if (result.scoringTeamId && typeof result.delta === 'number') triggerScoreFlash(result.scoringTeamId, result.delta);
-    if (result.wasCorrect) confettiBurst(70);
+    if (result.wasCorrect) { confettiBurst(70); playSfx('select'); } else { playSfx('wrong'); }
     // Round transition used to be entirely invisible (turn just moved on) --
     // this is the "make it obvious a new round started" banner from
     // PROGRESS.md items 3/4. roomState.rounds itself doesn't change on a

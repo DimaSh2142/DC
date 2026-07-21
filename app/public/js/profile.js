@@ -13,15 +13,24 @@
   const gateSection = document.getElementById('gate-section');
   const gateForm = document.getElementById('gate-form');
   const gateInput = document.getElementById('gate-nickname');
+  const gatePasswordInput = document.getElementById('gate-password');
+  const cabinetBackLink = document.getElementById('cabinet-back-link');
   const profileSection = document.getElementById('profile-section');
   const lockedBanner = document.getElementById('locked-banner');
   const avatarPreviewWrap = document.getElementById('avatar-preview-wrap');
   const avatarPicker = document.getElementById('avatar-picker');
   const avatarPickerLabel = document.getElementById('avatar-picker-label');
   const avatarFileInput = document.getElementById('avatar-file-input');
+  const avatarPresetBtn = document.getElementById('avatar-preset-btn');
   const nicknameInput = document.getElementById('nickname-input');
   const saveNicknameBtn = document.getElementById('save-nickname-btn');
   const switchProfileBtn = document.getElementById('switch-profile-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  const accountBadge = document.getElementById('account-badge');
+  const adminGrantPanel = document.getElementById('admin-grant-panel');
+  const grantNicknameInput = document.getElementById('grant-nickname');
+  const grantAmountInput = document.getElementById('grant-amount');
+  const grantKkoinBtn = document.getElementById('grant-kkoin-btn');
   const statCorrect = document.getElementById('stat-correct');
   const statIncorrect = document.getElementById('stat-incorrect');
   const statGames = document.getElementById('stat-games');
@@ -97,6 +106,7 @@
     avatarPicker.style.opacity = locked ? '.5' : '1';
     avatarPicker.style.pointerEvents = locked ? 'none' : 'auto';
     avatarPickerLabel.textContent = locked ? 'Заблоковано' : 'Змінити фото';
+    avatarPresetBtn.disabled = locked;
     lockedBanner.style.display = locked ? '' : 'none';
 
     statCorrect.textContent = profile.correct || 0;
@@ -104,6 +114,86 @@
     statGames.textContent = profile.gamesPlayed || 0;
     kkoinAmount.textContent = profile.kkoin || 0;
     renderItems();
+    renderAccountBadge();
+    applyAdminPanelVisibility();
+  }
+
+  // ---- accounts (2026-07-21 "система реєстрації + логін" expansion) ----
+  // See common.js's getAuth/setAuth/clearAuth and src/routes/authRoutes.js.
+  // "🔑 Акаунт" only shows when the CACHED session actually matches the
+  // profile currently open (same device could have an old admin session
+  // cached from an earlier nickname -- see the gate-submit handler's
+  // clearAuth() on the no-password path, which exists specifically to avoid
+  // that leaking into someone else's guest view on a shared computer).
+  function sessionMatchesOpenProfile(auth) {
+    return !!(auth && auth.login && currentNickname && auth.login.trim().toLowerCase() === currentNickname.trim().toLowerCase());
+  }
+
+  function renderAccountBadge() {
+    const auth = getAuth();
+    if (sessionMatchesOpenProfile(auth)) {
+      accountBadge.textContent = auth.role === 'admin' ? '🛡️ Акаунт (адмін)' : '🔑 Акаунт';
+    } else {
+      accountBadge.textContent = '👤 Гість (без пароля)';
+    }
+    logoutBtn.style.display = sessionMatchesOpenProfile(auth) ? '' : 'none';
+  }
+
+  function applyAdminPanelVisibility() {
+    const auth = getAuth();
+    adminGrantPanel.style.display = (sessionMatchesOpenProfile(auth) && auth.role === 'admin') ? '' : 'none';
+  }
+
+  function setBackLinkToHome() {
+    cabinetBackLink.textContent = '← На головну';
+    cabinetBackLink.href = '/';
+    cabinetBackLink.onclick = null;
+  }
+
+  // dima 2026-07-21 screenshot 1: "щоб повернення було назад в кабінет а не
+  // на головну" -- only relevant in the one moment the gate is shown WHILE a
+  // cabinet was already open (i.e. mid "Інший нікнейм"): "back" there should
+  // cancel that and return to the cabinet you already had open, not bounce
+  // you out to the homepage. On a fresh page load (no cabinet opened yet)
+  // the link stays the ordinary home link -- there's nothing to "go back" to.
+  function setBackLinkToCabinet() {
+    cabinetBackLink.textContent = '← Назад у кабінет';
+    cabinetBackLink.href = '#';
+    cabinetBackLink.onclick = (e) => {
+      e.preventDefault();
+      gateSection.style.display = 'none';
+      profileSection.style.display = '';
+      setBackLinkToHome();
+    };
+  }
+
+  // Tries logging in with whatever password was typed; if this nickname has
+  // no account yet, treats typing a password at all as "create one for me"
+  // (dima: "щоб звичайні гравці могли створити акаунт... Робимо систему
+  // реєстрації... або log in") -- no separate register screen needed, one
+  // field does both jobs.
+  function authenticateAndOpen(nickname, password) {
+    api('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login: nickname, password })
+    }).then(({ status, data }) => {
+      if (status === 200) {
+        setAuth({ token: data.token, login: data.login, role: data.role });
+        return loadProfile(data.login);
+      }
+      if (data && data.code === 'ACCOUNT_NOT_FOUND') {
+        return api('/api/auth/register', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ login: nickname, password })
+        }).then(({ status: regStatus, data: regData }) => {
+          if (regStatus !== 200) return toast((regData && regData.error) || 'Не вдалося створити акаунт', true);
+          setAuth({ token: regData.token, login: regData.login, role: regData.role });
+          toast('Акаунт створено!');
+          loadProfile(regData.login);
+        });
+      }
+      toast((data && data.error) || 'Невірний пароль', true);
+    }).catch(() => toast('Не вдалося з’єднатися із сервером', true));
   }
 
   // "Речі на вивід" -- forward-looking scaffolding for future Казино
@@ -131,6 +221,7 @@
       localStorage.setItem(NICK_KEY, currentNickname);
       gateSection.style.display = 'none';
       profileSection.style.display = '';
+      setBackLinkToHome();
       renderProfile();
     }).catch(() => toast('Не вдалося з’єднатися із сервером', true));
   }
@@ -138,15 +229,60 @@
   gateForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const nickname = gateInput.value.trim();
+    const password = gatePasswordInput.value;
     if (!nickname) return toast('Введіть нікнейм', true);
-    loadProfile(nickname);
+    if (!password) {
+      // Guest path, unchanged from before accounts existed -- also drops any
+      // previously-cached session so a shared device can't leak an earlier
+      // person's admin panel/account badge into this nickname's guest view.
+      clearAuth();
+      return loadProfile(nickname);
+    }
+    authenticateAndOpen(nickname, password);
   });
 
   switchProfileBtn.addEventListener('click', () => {
     profileSection.style.display = 'none';
     gateSection.style.display = '';
     gateInput.value = '';
+    gatePasswordInput.value = '';
+    setBackLinkToCabinet();
     gateInput.focus();
+  });
+
+  logoutBtn.addEventListener('click', () => {
+    const auth = getAuth();
+    if (auth && auth.token) {
+      api('/api/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + auth.token } }).catch(() => {});
+    }
+    clearAuth();
+    toast('Вийшли з акаунту');
+    renderAccountBadge();
+    applyAdminPanelVisibility();
+  });
+
+  grantKkoinBtn.addEventListener('click', () => {
+    const auth = getAuth();
+    if (!auth || !auth.token) return toast('Спочатку увійди в акаунт адміністратора', true);
+    const targetNickname = grantNicknameInput.value.trim();
+    const amount = Number(grantAmountInput.value);
+    if (!targetNickname) return toast('Вкажи нікнейм гравця', true);
+    if (!Number.isFinite(amount) || amount === 0) return toast('Вкажи кількість (не нуль)', true);
+    api('/api/auth/grant-kkoin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth.token },
+      body: JSON.stringify({ nickname: targetNickname, amount })
+    }).then(({ status, data }) => {
+      if (status !== 200) return toast((data && data.error) || 'Не вдалося видати ККоїни', true);
+      toast('Видано ' + amount + ' ККоїн гравцю ' + targetNickname + ' (баланс: ' + data.profile.kkoin + ')');
+      grantNicknameInput.value = '';
+      grantAmountInput.value = '';
+      // Granting to yourself should show up on your own visible balance too.
+      if (targetNickname.trim().toLowerCase() === currentNickname.trim().toLowerCase()) {
+        profile = data.profile;
+        renderProfile();
+      }
+    }).catch(() => toast('Не вдалося з’єднатися із сервером', true));
   });
 
   avatarPicker.addEventListener('click', () => { if (!locked) avatarFileInput.click(); });
@@ -167,6 +303,70 @@
       renderProfile();
       toast('Аватарку оновлено!');
     }).catch((err) => { avatarSaveInFlight = false; toast(err.message || 'Не вдалося оновити фото', true); });
+  });
+
+  // ---- "Готові аватарки" (2026-07-21 asset expansion) -- 20 flat character
+  // badges cut from Kay Lousberg's CC0 "KayKit: Board Game Bits" pack (see
+  // README.md "Готові аватарки та інші нові текстури" for the attribution
+  // this pack doesn't legally require but is nice to give anyway). Static
+  // files under /img/avatar-presets/ are only 112x112 already, but still get
+  // pushed through the exact same canvas round-trip as an uploaded photo (via
+  // PNG this time, not JPEG -- these have a transparent background a lossy
+  // JPEG would flatten to a black/white square) so the server sees the same
+  // kind of self-contained data: URL either path produces, and
+  // roomManager.normalizeAvatar doesn't need a second code path to trust it.
+  const AVATAR_PRESETS = [
+    'blue_knight', 'blue_mage', 'blue_rogue', 'blue_barbarian',
+    'red_knight', 'red_mage', 'red_rogue', 'red_barbarian',
+    'green_knight', 'green_mage', 'green_rogue', 'green_barbarian',
+    'yellow_knight', 'yellow_mage', 'yellow_rogue', 'yellow_barbarian',
+    'skeleton_brute', 'skeleton_mage', 'skeleton_rogue', 'skeleton_minion'
+  ];
+
+  function presetLabel(id) {
+    return id.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+
+  function presetUrlToDataUrl(url) {
+    return fetch(url).then((r) => r.blob()).then((blob) => new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Не вдалося завантажити аватарку')); };
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        URL.revokeObjectURL(objectUrl);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = objectUrl;
+    }));
+  }
+
+  function choosePresetAvatar(id) {
+    if (locked || avatarSaveInFlight) return;
+    avatarSaveInFlight = true;
+    presetUrlToDataUrl('/img/avatar-presets/' + id + '.png').then((dataUrl) => api('/api/profile/' + encodeURIComponent(currentNickname), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avatar: dataUrl })
+    })).then(({ status, data }) => {
+      avatarSaveInFlight = false;
+      if (status !== 200 || data.error) return toast((data && data.error) || 'Не вдалося оновити фото', true);
+      profile = data.profile;
+      localStorage.setItem('sigame_avatar', profile.avatar || '');
+      renderProfile();
+      closeModal();
+      toast('Аватарку оновлено!');
+    }).catch((err) => { avatarSaveInFlight = false; toast(err.message || 'Не вдалося оновити фото', true); });
+  }
+
+  avatarPresetBtn.addEventListener('click', () => {
+    if (locked) return;
+    const grid = el('div', { class: 'avatar-preset-grid' }, AVATAR_PRESETS.map((id) => el('button', {
+      type: 'button', class: 'avatar-preset-item', title: presetLabel(id), onclick: () => choosePresetAvatar(id)
+    }, [el('img', { src: '/img/avatar-presets/' + id + '.png', alt: presetLabel(id), width: '56', height: '56' })])));
+    openModal('Готові аватарки', [grid]);
   });
 
   saveNicknameBtn.addEventListener('click', () => {

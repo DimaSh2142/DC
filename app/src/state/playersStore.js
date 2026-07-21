@@ -7,6 +7,7 @@ const path = require('path');
 const { readJson, writeJsonAtomic } = require('./jsonStore');
 
 const FILE = path.join(__dirname, '..', '..', 'data', 'players.json');
+const BUBBLE_MAX_LEVEL = 200; // "Бульбашки" -- dima: "загалом було 200 рівнів"
 
 let cache = null;
 
@@ -202,7 +203,10 @@ function advanceBubbleLevel(nickname, clearedLevel, rewardAmount) {
   if (!Number.isInteger(clearedLevelNum) || clearedLevelNum !== profile.bubbleLevel) {
     return { error: 'Рівень не збігається з поточним прогресом', profile };
   }
-  profile.bubbleLevel += 1;
+  // 200 is the last level (2026-07-21, dima: "загалом було 200 рівнів") --
+  // once there, re-clearing it just keeps paying out KKoin forever rather
+  // than trying to advance past a level that doesn't exist.
+  profile.bubbleLevel = Math.min(profile.bubbleLevel + 1, BUBBLE_MAX_LEVEL);
   profile.kkoin = Math.max(0, (profile.kkoin || 0) + (Number(rewardAmount) || 0));
   save();
   return { profile, awarded: Number(rewardAmount) || 0 };

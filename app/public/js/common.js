@@ -34,7 +34,64 @@ function setMusicVolume(v) { localStorage.setItem(SETTINGS_KEYS.musicVolume, Str
 function getMicVolume() { return clampPercent(localStorage.getItem(SETTINGS_KEYS.micVolume), 100); }
 function setMicVolume(v) { localStorage.setItem(SETTINGS_KEYS.micVolume, String(clampPercent(v, 100))); }
 
+// ---- site accounts (2026-07-21 "система реєстрації/логін" expansion) ----
+// Layered on top of the existing nickname-is-identity model (see
+// playersStore.js) -- an account's login IS the nickname, and this is just
+// an optional token+role remembered client-side after a successful
+// login/registration in Особистий кабінет (see profile.js). Read by quiz.js
+// (to decide whether to show the "Адмін-панель" button) and profile.js (to
+// decide whether to show the admin-only "видати ККоїни" panel). NOT itself a
+// security boundary -- the server independently re-checks the token/role on
+// every protected request (see authSessions.js's requireAdmin), so worst
+// case a stale/tampered value here just shows or hides a button wrongly for
+// a moment; it can never grant real access on its own.
+const AUTH_KEY = 'sigame_auth';
+function getAuth() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+function setAuth(auth) { localStorage.setItem(AUTH_KEY, JSON.stringify(auth)); }
+function clearAuth() { localStorage.removeItem(AUTH_KEY); }
+
+// ---- sound effects (2026-07-21, dima: "Можеш і звукові ефекти добавити" +
+// uploaded JDSherbert Sci-Fi UI / Tabletop Games SFX packs -- both marked
+// "FREE" by the author, see README.md's asset-attribution note for why there
+// is no more precise license string than that). A handful of short,
+// purposeful cues wired into shared functions here (toast/openModal/
+// closeModal) so every page that already calls those gets sound for free,
+// plus a few explicit calls in player.js/checkers.js/chess.js/battleship.js/
+// bubbles.js for moments those shared helpers don't cover (correct/wrong
+// answer, piece capture, round transitions). Deliberately NOT wired to every
+// single click/hover -- that gets old fast in an app people reopen daily.
+const SFX_FILES = {
+  select: '/audio/sfx/select.mp3',       // correct answer, level clear, success toasts
+  wrong: '/audio/sfx/wrong.mp3',         // wrong answer, error toasts
+  popupOpen: '/audio/sfx/popup-open.mp3',
+  popupClose: '/audio/sfx/popup-close.mp3',
+  swipe: '/audio/sfx/swipe.mp3',         // round-transition banner
+  move: '/audio/sfx/move.mp3',           // checkers/chess move, battleship miss
+  impact: '/audio/sfx/impact.mp3'        // checkers/chess capture, battleship hit, bubble pop
+};
+// A fresh Audio() per play (rather than one shared, reused element) so two
+// sounds fired in quick succession (e.g. a toast right as a modal opens)
+// don't cut each other off. Scaled off the existing music-volume setting --
+// someone who already turned background music down low clearly prefers a
+// quieter app, so SFX should follow that same preference rather than adding
+// yet another volume slider for a handful of short blips.
+function playSfx(name) {
+  const src = SFX_FILES[name];
+  if (!src) return;
+  try {
+    const audio = new Audio(src);
+    audio.volume = Math.max(0, Math.min(1, getMusicVolume() / 100)) * 0.6;
+    audio.play().catch(() => {}); // browser autoplay policy may reject before any user gesture -- fine, just skip
+  } catch (e) { /* SFX are a nice-to-have, never worth breaking the app over */ }
+}
+
 function toast(message, isError) {
+  playSfx(isError ? 'wrong' : 'select');
   const el = document.createElement('div');
   el.className = 'toast' + (isError ? ' error' : '');
   el.textContent = message;
@@ -95,11 +152,12 @@ function avatarEl(player, size) {
 let activeModalLayer = null;
 
 function closeModal() {
-  if (activeModalLayer) { activeModalLayer.remove(); activeModalLayer = null; }
+  if (activeModalLayer) { activeModalLayer.remove(); activeModalLayer = null; playSfx('popupClose'); }
 }
 
 function openModal(title, bodyNodes) {
   closeModal();
+  playSfx('popupOpen');
   const card = el('div', { class: 'modal-card', onclick: (e) => e.stopPropagation() }, [
     el('div', { class: 'row between', style: 'align-items:flex-start;' }, [
       el('h3', { style: 'margin:0;' }, [title]),
@@ -118,6 +176,7 @@ function openModal(title, bodyNodes) {
 // even while animating out -- it self-removes on a timer, not on click.
 let roundBannerHandle = null;
 function showRoundBanner(title, subtitle) {
+  playSfx('swipe');
   if (roundBannerHandle) { clearTimeout(roundBannerHandle.timeout); roundBannerHandle.layer.remove(); }
   const layer = el('div', { class: 'round-banner-layer' }, [
     el('div', { class: 'round-banner-card' }, [

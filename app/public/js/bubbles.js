@@ -31,6 +31,7 @@
   const canvas = document.getElementById('bubbles-canvas');
   const ctx = canvas.getContext('2d');
   const overlay = document.getElementById('bubbles-overlay');
+  const overlayMascot = document.getElementById('bubbles-overlay-mascot');
   const overlayTitle = document.getElementById('bubbles-overlay-title');
   const overlaySub = document.getElementById('bubbles-overlay-sub');
   const overlayBtn = document.getElementById('bubbles-overlay-btn');
@@ -70,10 +71,22 @@
   function pixelY(rowIndex) { return MARGIN_Y + BUBBLE_R + rowIndex * ROW_H; }
 
   // ---- difficulty curve ----
-  function numRowsForLevel(level) { return Math.min(4 + Math.floor((level - 1) / 2), 8); }
-  function numColorsForLevel(level) { return Math.min(3 + Math.floor((level - 1) / 2), PALETTE.length); }
-  function shotsPerDescentForLevel(level) { return Math.max(14 - level, 5); }
-  function ballSpeedForLevel(level) { return Math.min(420 + level * 6, 620); }
+  // 2026-07-21 rework: dima wanted the STARTING level roughly 3x harder than
+  // before, scaling to a full MAX_LEVEL of 200. A single "difficulty" number
+  // doesn't really exist for a game like this, so "3x harder" is spread
+  // across every lever at once (more starting rows, more starting colors,
+  // a much tighter shots-before-the-ceiling-drops cadence, a faster ball) --
+  // together these make level 1 feel dramatically harder than the old
+  // 4-row/3-color/13-shot start. Board size and color count are necessarily
+  // capped by the fixed 8-column board and the 6-color palette (see PALETTE
+  // below), so from roughly level 20 onward, continued difficulty comes from
+  // pace (shots-per-descent, ball speed) rather than board size -- that's
+  // deliberate, not a missing feature.
+  const MAX_LEVEL = 200;
+  function numRowsForLevel(level) { return Math.min(6 + Math.floor((level - 1) / 4), 9); }
+  function numColorsForLevel(level) { return Math.min(5 + Math.floor((level - 1) / 5), PALETTE.length); }
+  function shotsPerDescentForLevel(level) { return Math.max(5 - Math.floor((level - 1) / 15), 2); }
+  function ballSpeedForLevel(level) { return Math.min(480 + level * 3, 820); }
 
   function randomActiveColor() { return activeColors[Math.floor(Math.random() * activeColors.length)]; }
 
@@ -95,6 +108,32 @@
     const cols = offset === 0 ? COLS : COLS - 1;
     const cells = new Array(cols).fill(null).map(() => ({ color: randomActiveColor() }));
     return { offset, cells };
+  }
+
+  // CRITICAL FIX (2026-07-21, "гра чомусь не працює"): grid only ever held
+  // however many rows had explicitly been created (initial rows + any that
+  // descended from the ceiling). A fired ball colliding with the bottom-most
+  // existing row had nowhere to attach BELOW that row -- neighborsOf() only
+  // looks at rows that already exist in the array, and the old fallback
+  // search in snapNear() capped its range at `grid.length - 1`, so it could
+  // never consider a not-yet-existing row either. At the start of a level
+  // every row is fully packed (no gaps), so literally the very first shot
+  // had no empty neighbor ANYWHERE it could find -- it just vanished with no
+  // effect, forever, making the game completely unplayable from shot one.
+  // Fix: always keep one fully-empty row available past whatever is
+  // currently the lowest occupied row, so there's always somewhere for a
+  // ball to attach "below". Called after building a level and after every
+  // resolved shot.
+  function ensureBottomBuffer() {
+    let lastOccupied = -1;
+    for (let r = 0; r < grid.length; r++) {
+      if (grid[r].cells.some((c) => c)) lastOccupied = r;
+    }
+    while (grid.length <= lastOccupied + 1) {
+      const offset = grid.length ? (1 - grid[grid.length - 1].offset) : 0;
+      const cols = offset === 0 ? COLS : COLS - 1;
+      grid.push({ offset, cells: new Array(cols).fill(null) });
+    }
   }
 
   function cellAt(r, c) {
@@ -197,16 +236,18 @@
     overlay.style.display = 'none';
     currentLevel = level;
     grid = buildInitialGrid(level);
+    ensureBottomBuffer();
     shotsFired = 0;
     flying = null;
     currentColor = pickRandomColor();
     nextColor = pickRandomColor();
     gameActive = true;
-    levelEl.textContent = String(level);
+    levelEl.textContent = String(level) + (level >= MAX_LEVEL ? ' (максимум)' : '');
   }
 
   function performDescend() {
     grid.unshift(makeDescendRow());
+    ensureBottomBuffer();
     if (isDanger()) loseLevel();
   }
 
@@ -216,8 +257,10 @@
     if (group.length >= 3) {
       group.forEach(([r, c]) => { grid[r].cells[c] = null; });
       removeFloating();
+      playSfx('impact');
     }
     if (isBoardClear()) { winLevel(); return; }
+    ensureBottomBuffer();
     shotsFired += 1;
     if (shotsFired % shotsPerDescentForLevel(currentLevel) === 0) performDescend();
     if (!gameActive) return; // performDescend may have just ended the level (danger reached)
@@ -242,7 +285,15 @@
       currentKkoin = data.profile.kkoin;
       kkoinEl.textContent = currentKkoin;
       const nextLevelNum = data.profile.bubbleLevel;
-      showOverlay('🎉 Рівень ' + currentLevel + ' пройдено!', '+' + data.awarded + ' ККоїн — далі складніше', 'Наступний рівень', () => startLevel(nextLevelNum));
+      const atCap = currentLevel >= MAX_LEVEL;
+      playSfx('select');
+      showOverlay(
+        atCap ? '🏆 Максимальний рівень!' : ('🎉 Рівень ' + currentLevel + ' пройдено!'),
+        atCap ? ('+' + data.awarded + ' ККоїн — ти вже на межі складності (' + MAX_LEVEL + '), можна грати далі на коіни') : ('+' + data.awarded + ' ККоїн — далі складніше'),
+        atCap ? 'Грати ще раз' : 'Наступний рівень',
+        () => startLevel(nextLevelNum),
+        true
+      );
     }).catch(() => {
       showOverlay('Ой!', 'Не вдалося з’єднатися із сервером', 'Спробувати ще раз', () => startLevel(currentLevel));
     });
@@ -251,10 +302,17 @@
   function loseLevel() {
     gameActive = false;
     flying = null;
+    playSfx('wrong');
     showOverlay('💥 Кулі дісталися низу', 'Рівень ' + currentLevel + ' — спробуй ще раз', 'Спробувати ще раз', () => startLevel(currentLevel));
   }
 
-  function showOverlay(title, sub, btnText, onClick) {
+  // showMascot (2026-07-21, dima: "можеш типу той кет інтерфейс використати
+  // десь") -- a tiny cat-face icon cut from the CatUI Free sprite sheet (see
+  // README.md's asset-attribution note), shown only on an actual level-clear,
+  // not on the error/retry path or on losing (a cheerful cat doesn't fit
+  // either of those moments).
+  function showOverlay(title, sub, btnText, onClick, showMascot) {
+    overlayMascot.style.display = showMascot ? '' : 'none';
     overlayTitle.textContent = title;
     overlaySub.textContent = sub;
     overlayBtn.textContent = btnText;

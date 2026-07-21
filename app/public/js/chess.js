@@ -37,6 +37,7 @@
   function doMove(from, to, promotion) {
     socket.emit('mg:chess_move', { from, to, promotion }, (res) => {
       if (res.error) { toast(res.error, true); return; }
+      playSfx(res.captured ? 'impact' : 'move');
       selected = null;
       render();
     });

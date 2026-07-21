@@ -12,7 +12,7 @@ module.exports = {
   HINT_EXTRA_MS: 15000,        // extra answer time granted when a hint is bought (dima's "гра зупинялась на 15 секунд")
   DEFAULT_THEMES_PER_ROUND: 5,
   DEFAULT_NUM_ROUNDS: 2,
-  DEFAULT_NUM_TEAMS: 3,
+  DEFAULT_NUM_TEAMS: 2, // dima 2026-07-21: "Зроби щоб по базі стояло 2 команди, а не 3"
   ADMIN_TOKEN_TTL_MS: 24 * 60 * 60 * 1000, // 24h
 
   // KKoin economy (2026-07-21 "глобальний проект" expansion). Awarded to the

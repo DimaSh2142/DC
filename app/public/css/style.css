@@ -111,6 +111,16 @@ h1, h2, h3 { margin: 0 0 .4em 0; line-height: 1.2; }
 }
 .brand-title .accent { color: var(--crimson); }
 
+/* quiz.html's logo+"DSLand" header (dima 2026-07-21, screenshot 2: "виправи
+   щоб текст і логотип були рівненькими і гарними") -- previously a bare
+   inline <img> + <h1> inside a text-align:center card, which left the
+   (inline-by-default) logo sitting slightly off from the heading's center
+   line. A flex column, same technique as the homepage hub's .hub-hero,
+   guarantees both are centered on the same axis with even spacing. */
+.quiz-hero { display: flex; flex-direction: column; align-items: center; margin-bottom: 6px; }
+.quiz-hero-logo { width: 140px; height: auto; display: block; margin: 0 0 12px; }
+.quiz-hero-title { margin: 0; font-size: 34px; text-align: center; line-height: 1.15; }
+
 input[type="text"], input[type="password"], input[type="number"], select {
   font-size: 16px;
   padding: 12px 14px;
@@ -434,6 +444,15 @@ th { color: var(--turquoise-dark); }
 .avatar-picker-preview .avatar-circle { border: 3px solid var(--turquoise); box-shadow: 0 4px 12px var(--shadow); }
 .avatar-picker-label { font-size: 12px; font-weight: 600; color: var(--turquoise-dark); }
 .avatar-remove-link { display: block; text-align: center; font-size: 12px; margin-top: -4px; }
+/* "Готові аватарки" modal grid (2026-07-21, KayKit badge presets) */
+.avatar-preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.avatar-preset-item {
+  background: var(--bg); border: 2px solid transparent; border-radius: var(--radius);
+  padding: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.avatar-preset-item:hover { border-color: var(--turquoise); transform: translateY(-2px); }
+.avatar-preset-item img { width: 56px; height: 56px; image-rendering: pixelated; }
 .roster-row { display: flex; align-items: center; gap: 8px; }
 .mini-roster { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 .mini-roster-row { display: flex; align-items: center; gap: 6px; font-size: 13px; }
@@ -578,8 +597,8 @@ th { color: var(--turquoise-dark); }
   flex-direction: column;
   align-items: center;
 }
-.hub-logo { width: 240px; max-width: 60vw; height: auto; margin-bottom: 12px; }
-.hub-title { font-size: 40px; }
+.hub-logo { width: 340px; max-width: 72vw; height: auto; margin-bottom: 14px; } /* dima 2026-07-21 screenshot 4: "набагато збільши логотип та напис" */
+.hub-title { font-size: 62px; }
 .hub-tagline { color: var(--turquoise-dark); margin: 6px 0 0; font-size: 15px; }
 
 /* ---- small "back to hub" link used on every sub-page (quiz/casino/mini-games/profile) ---- */
@@ -704,6 +723,7 @@ th { color: var(--turquoise-dark); }
   text-align: center;
   max-width: 260px;
 }
+.bubbles-overlay-mascot { width: 48px; height: auto; image-rendering: pixelated; margin-bottom: 6px; }
 .bubbles-overlay-title { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
 .bubbles-overlay-sub { font-size: 13px; color: var(--turquoise-dark); margin-bottom: 16px; }
 .bubbles-help { font-size: 12px; color: var(--turquoise-dark); margin: 12px 0 6px; }
