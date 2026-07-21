@@ -24,8 +24,6 @@
   // the hardcoded default -- see PROGRESS.md "known limitation" note.
   const controlsDraft = { numTeams: 3, numRounds: 2, perRound: 5 };
   const teamNameDrafts = {}; // teamId -> in-progress typed name (same purpose as controlsDraft)
-  const teamScoreDrafts = {}; // teamId -> in-progress typed +/- amount for the host score-adjust tool
-  const playerScoreDrafts = {}; // nicknameKey -> in-progress typed +/- amount for the personal bonus tool
 
   const TEAM_COLOR_CLASS = {
     turquoise: 'team-turquoise', crimson: 'team-crimson', orange: 'team-orange',
@@ -90,6 +88,16 @@
       render();
     });
     socket.on('answer:corrected', (payload) => { lastResolved = { ...lastResolved, wasCorrect: payload.corrected.wasCorrect, delta: payload.corrected.delta }; render(); });
+    // dima's point 5: a team bought a hint mid-question -- the clock just
+    // got 15s longer. The questionKey hasn't changed so syncAdminTimerFromState
+    // would no-op; force-restart the bar against the new remaining time
+    // (same "fresh bar from msRemaining" simplification the reconnect path uses).
+    socket.on('hint:used', (payload) => {
+      if (!selected || payload.code !== selected.code) return;
+      toast('Команда «' + teamName(selected, payload.teamId) + '» купила підказку (−' + payload.cost + '), +15с на таймер');
+      adminTimerQuestionKey = null;
+      startAdminTimer(payload.themeId + ':' + payload.price, Math.max(1000, payload.msRemaining || 15000));
+    });
   }
 
   function startAdminTimer(questionKey, totalMs) {
@@ -296,10 +304,11 @@
   }
 
   // Host tool: nudge one player's personal bonus counter. Separate from team
-  // score -- see roomManager.adjustPlayerScore doc comment for why.
+  // score -- see roomManager.adjustPlayerScore doc comment for why. Fixed
+  // +/-100 step per dima's request -- no more typed arbitrary amount.
+  const SCORE_STEP = 100;
   function adjustPlayerScore(roomCode, nicknameKey, sign) {
-    const amount = parseInt(playerScoreDrafts[nicknameKey], 10) || 10;
-    socket.emit('admin:adjust_player_score', { roomCode, nicknameKey, delta: sign * amount }, (res) => { if (res && res.error) toast(res.error, true); });
+    socket.emit('admin:adjust_player_score', { roomCode, nicknameKey, delta: sign * SCORE_STEP }, (res) => { if (res && res.error) toast(res.error, true); });
   }
 
   function renderRosterPanel(r) {
@@ -307,11 +316,6 @@
       el('h3', {}, ['Гравці (' + r.players.length + ')']),
       el('div', { class: 'stack roster-list' }, r.players.map(p => {
         const nicknameKey = p.nickname.toLowerCase();
-        if (!(nicknameKey in playerScoreDrafts)) playerScoreDrafts[nicknameKey] = 10;
-        const amountInput = el('input', {
-          type: 'number', class: 'score-adjust-input', value: String(playerScoreDrafts[nicknameKey]), min: '1',
-          oninput: (e) => { playerScoreDrafts[nicknameKey] = e.target.value; }
-        });
         // Manual team-move (point 5): on top of the balanced snake-draft
         // button in renderControlsPanel, dima wanted to be able to hand-move
         // one player at a time (e.g. two friends who want to be together).
@@ -333,9 +337,8 @@
           ]),
           el('div', { class: 'player-row-controls' }, [
             el('span', { class: 'badge outline', title: 'Особистий бонус-рахунок (не впливає на рахунок команди)' }, ['бонус: ' + (p.personalScore > 0 ? '+' : '') + p.personalScore]),
-            amountInput,
-            el('button', { class: 'btn-small btn-outline', onclick: () => adjustPlayerScore(r.code, nicknameKey, +1) }, ['+']),
-            el('button', { class: 'btn-small btn-outline crimson', onclick: () => adjustPlayerScore(r.code, nicknameKey, -1) }, ['−']),
+            el('button', { class: 'btn-small btn-outline', title: '+100', onclick: () => adjustPlayerScore(r.code, nicknameKey, +1) }, ['+100']),
+            el('button', { class: 'btn-small btn-outline crimson', title: '-100', onclick: () => adjustPlayerScore(r.code, nicknameKey, -1) }, ['−100']),
             moveSelect ? el('span', { title: 'Перекинути гравця в іншу команду вручну' }, ['→', moveSelect]) : null
           ])
         ]);
@@ -501,24 +504,17 @@
   // the actual "SIGame host" power dima asked for (broader than
   // admin:override_answer, which only flips the single most recent answer).
   function adjustTeamScore(roomCode, teamId, sign) {
-    const amount = parseInt(teamScoreDrafts[teamId], 10) || 10;
-    socket.emit('admin:adjust_team_score', { roomCode, teamId, delta: sign * amount }, (res) => { if (res && res.error) toast(res.error, true); });
+    socket.emit('admin:adjust_team_score', { roomCode, teamId, delta: sign * SCORE_STEP }, (res) => { if (res && res.error) toast(res.error, true); });
   }
 
   function renderTeamScorePanel(r) {
     const rows = r.teams.map(t => {
-      if (!(t.id in teamScoreDrafts)) teamScoreDrafts[t.id] = 10;
-      const amountInput = el('input', {
-        type: 'number', class: 'score-adjust-input', value: String(teamScoreDrafts[t.id]), min: '1',
-        oninput: (e) => { teamScoreDrafts[t.id] = e.target.value; }
-      });
       return el('div', { class: 'row between', style: 'padding:8px 0; border-bottom:1px solid var(--turquoise-light);' }, [
         el('span', { class: 'badge ' + (t.color === 'crimson' || t.color === 'crimson-dark' ? 'crimson' : t.color === 'orange' || t.color === 'orange-dark' ? 'orange' : '') }, [t.name]),
         el('strong', { style: 'font-size:18px;' }, [String(t.score)]),
         el('div', { class: 'team-score-adjust' }, [
-          amountInput,
-          el('button', { class: 'btn-small btn-outline', onclick: () => adjustTeamScore(r.code, t.id, +1) }, ['+ дати']),
-          el('button', { class: 'btn-small btn-outline crimson', onclick: () => adjustTeamScore(r.code, t.id, -1) }, ['− зняти'])
+          el('button', { class: 'btn-small btn-outline', onclick: () => adjustTeamScore(r.code, t.id, +1) }, ['+100']),
+          el('button', { class: 'btn-small btn-outline crimson', onclick: () => adjustTeamScore(r.code, t.id, -1) }, ['−100'])
         ])
       ]);
     });

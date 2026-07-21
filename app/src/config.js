@@ -8,6 +8,8 @@ module.exports = {
   // Gameplay tuning -- safe to tweak without touching game logic.
   NEGATIVE_ON_WRONG: true,     // classic "Своя Гра" style: wrong/timeout subtracts price
   ANSWER_TIMEOUT_MS: 45000,    // time a team gets to answer once a question is opened
+  HINT_COST_RATIO: 0.5,        // "купити підказку у адміна" costs this fraction of the question price
+  HINT_EXTRA_MS: 15000,        // extra answer time granted when a hint is bought (dima's "гра зупинялась на 15 секунд")
   DEFAULT_THEMES_PER_ROUND: 5,
   DEFAULT_NUM_ROUNDS: 2,
   DEFAULT_NUM_TEAMS: 3,

@@ -58,6 +58,17 @@ function registerSocketHandlers(io, { roomManager, adminAuth }) {
     io.to('admin-' + room.code).emit('admin:room_state', roomManager.adminState(room));
   }
 
+  // dima's point 7: only that team's own members should get the update --
+  // targets each member's individual socket by the id already tracked on
+  // room.players (server-side truth), no separate join/leave group needed
+  // (unlike voice chat, there's no signaling handshake here, just state).
+  function broadcastTeamMusic(room, teamId, state) {
+    const payload = { code: room.code, teamId, state };
+    for (const p of room.players.values()) {
+      if (p.teamId === teamId && p.socketId) io.to(p.socketId).emit('team_music:state', payload);
+    }
+  }
+
   // ---------- VOICE CHAT signaling state (team-scoped mesh WebRTC) ----------
   // Deliberately NOT using socket.io's built-in room adapter for the actual
   // isolation guarantee (that's just used for the join-your-own-id emit
@@ -360,6 +371,77 @@ function registerSocketHandlers(io, { roomManager, adminAuth }) {
       io.to(room.code).emit('answer:resolved', result);
       broadcastPublicState(room);
       broadcastAdminState(room);
+      if (cb) cb({ ok: true });
+    }));
+
+    // dima's point 5: active team spends 50% of the question's price (from
+    // their own team score) to buy 15 extra answer-clock seconds. teamId
+    // comes from the caller's OWN roster entry, never the client payload --
+    // same server-is-truth pattern as pick_question/voice:join, so a player
+    // can never spend a hint funded by a team they aren't on.
+    socket.on('player:use_hint', safe(async (payload, cb) => {
+      const room = roomManager.getRoom(socket.data.roomCode);
+      if (!room) return cb && cb({ error: 'Ви не в кімнаті' });
+      const player = room.players.get(playersStore.keyOf(socket.data.nickname));
+      if (!player || !player.teamId) return cb && cb({ error: 'Спочатку маєте бути в команді' });
+
+      const result = roomManager.useHint(room, player.teamId, payload.themeId, payload.price);
+      if (result.error) return cb && cb({ error: result.error });
+
+      io.to(room.code).emit('hint:used', {
+        code: room.code, teamId: player.teamId, themeId: payload.themeId, price: payload.price,
+        cost: result.cost, extraMs: result.extraMs, msRemaining: result.msRemaining, totalMs: result.totalMs
+      });
+      broadcastPublicState(room);
+      broadcastAdminState(room);
+      if (cb) cb({ ok: true, cost: result.cost });
+    }));
+
+    // ---------- TEAM MUSIC (dima's point 7: synced across a team's separate
+    // devices, "команда чула музику навіть якщо грають на відстані") ----------
+    // teamId always comes from the caller's own roster entry, never the
+    // client payload -- same isolation guarantee as voice chat, just without
+    // a signaling handshake since this is plain shared state, not P2P audio.
+    socket.on('player:team_music_play', safe(async (payload, cb) => {
+      const room = roomManager.getRoom(socket.data.roomCode);
+      if (!room) return cb && cb({ error: 'Ви не в кімнаті' });
+      const player = room.players.get(playersStore.keyOf(socket.data.nickname));
+      if (!player || !player.teamId) return cb && cb({ error: 'Спочатку маєте бути в команді' });
+      const videoId = ((payload && payload.videoId) || '').trim();
+      if (!videoId) return cb && cb({ error: 'Не вдалося розпізнати посилання YouTube' });
+
+      const result = roomManager.setTeamMusic(room, player.teamId, {
+        videoId, isPlaying: true, positionSec: (payload && payload.positionSec) || 0
+      });
+      if (result.error) return cb && cb({ error: result.error });
+      broadcastTeamMusic(room, player.teamId, result.state);
+      if (cb) cb({ ok: true });
+    }));
+
+    socket.on('player:team_music_pause', safe(async (payload, cb) => {
+      const room = roomManager.getRoom(socket.data.roomCode);
+      if (!room) return cb && cb({ error: 'Ви не в кімнаті' });
+      const player = room.players.get(playersStore.keyOf(socket.data.nickname));
+      if (!player || !player.teamId) return cb && cb({ error: 'Спочатку маєте бути в команді' });
+      const current = room.teamMusic[player.teamId];
+      if (!current || !current.videoId) return cb && cb({ error: 'Немає активного треку' });
+
+      const result = roomManager.setTeamMusic(room, player.teamId, {
+        videoId: current.videoId, isPlaying: false, positionSec: (payload && payload.positionSec) || 0
+      });
+      if (result.error) return cb && cb({ error: result.error });
+      broadcastTeamMusic(room, player.teamId, result.state);
+      if (cb) cb({ ok: true });
+    }));
+
+    socket.on('player:team_music_stop', safe(async (payload, cb) => {
+      const room = roomManager.getRoom(socket.data.roomCode);
+      if (!room) return cb && cb({ error: 'Ви не в кімнаті' });
+      const player = room.players.get(playersStore.keyOf(socket.data.nickname));
+      if (!player || !player.teamId) return cb && cb({ error: 'Спочатку маєте бути в команді' });
+
+      roomManager.clearTeamMusic(room, player.teamId);
+      broadcastTeamMusic(room, player.teamId, null);
       if (cb) cb({ ok: true });
     }));
 

@@ -414,6 +414,85 @@ async function main() {
   const lastAdminRoomState = adminSock.lastReceived('admin:room_state');
   assert(!!lastAdminRoomState && lastAdminRoomState.code === roomCode9, 'the admin socket receives the admin:room_state broadcast for the room it just acted on, with the answer key attached');
 
+  // ---- "buy a hint" (added 2026-07-21 run, feedback item 5) ----
+  const created10 = await adminSock.trigger('admin:create_room', {});
+  const roomCode10 = created10.room.code;
+  const hn1 = newConnection('hn1'); await hn1.trigger('player:join', { nickname: 'Hinty', roomCode: roomCode10 });
+  const hn2 = newConnection('hn2'); await hn2.trigger('player:join', { nickname: 'Rival', roomCode: roomCode10 });
+  await adminSock.trigger('admin:assign_teams', { roomCode: roomCode10, numTeams: 2 });
+  await adminSock.trigger('admin:generate_board', { roomCode: roomCode10, numRounds: 1, themesPerRound: 2 });
+  await adminSock.trigger('admin:start_game', { roomCode: roomCode10 });
+
+  const room10 = roomManager.getRoom(roomCode10);
+  const activeTeam10 = roomManager.getActiveTeamId(room10);
+  const activeSockH = room10.players.get('hinty').teamId === activeTeam10 ? hn1 : hn2;
+  const idleSockH = activeSockH === hn1 ? hn2 : hn1;
+  const round10 = roomManager.getCurrentRound(room10);
+  const target10 = round10.themes[0].questions[0];
+
+  const noHintYet = await idleSockH.trigger('player:use_hint', { themeId: round10.themes[0].id, price: target10.price });
+  assert(noHintYet.error, 'player:use_hint rejected before any question is even open');
+
+  await activeSockH.trigger('player:pick_question', { themeId: round10.themes[0].id, price: target10.price });
+  const scoreBeforeHint = room10.teams.find(t => t.id === activeTeam10).score;
+
+  const wrongTeamHint = await idleSockH.trigger('player:use_hint', { themeId: round10.themes[0].id, price: target10.price });
+  assert(wrongTeamHint.error, 'a player on the team NOT currently answering cannot buy a hint');
+
+  const hintRes = await activeSockH.trigger('player:use_hint', { themeId: round10.themes[0].id, price: target10.price });
+  assert(hintRes.ok && hintRes.cost === Math.round(target10.price * config.HINT_COST_RATIO), 'player:use_hint succeeds and returns the correct 50% cost (' + (hintRes && hintRes.cost) + ')');
+  const scoreAfterHint = room10.teams.find(t => t.id === activeTeam10).score;
+  assert(scoreAfterHint === scoreBeforeHint - hintRes.cost, 'hint cost was actually deducted from the answering team\'s own score (' + scoreBeforeHint + ' -> ' + scoreAfterHint + ')');
+  assert(room10.activeQuestion.totalMs === config.ANSWER_TIMEOUT_MS + config.HINT_EXTRA_MS, 'answer clock total extended by exactly HINT_EXTRA_MS');
+  assert(room10.activeQuestion.hintUsed === true, 'activeQuestion flagged as hint-used');
+
+  const hintBroadcast = activeSockH.lastReceived('hint:used');
+  assert(hintBroadcast && hintBroadcast.teamId === activeTeam10 && hintBroadcast.cost === hintRes.cost, 'hint:used broadcast delivered with matching teamId/cost');
+
+  const secondHintSameQuestion = await activeSockH.trigger('player:use_hint', { themeId: round10.themes[0].id, price: target10.price });
+  assert(secondHintSameQuestion.error, 'a second hint on the SAME question is rejected (capped at once per question)');
+
+  // ---- networked team music sync (added 2026-07-21 run, feedback item 7) ----
+  const created11 = await adminSock.trigger('admin:create_room', {});
+  const roomCode11 = created11.room.code;
+  const noTeamYet = newConnection('nt1');
+  const noTeamJoin = await noTeamYet.trigger('player:join', { nickname: 'Loner', roomCode: roomCode11 });
+  assert(noTeamJoin.ok, 'sanity: Loner joined the team-music test room before any teams exist');
+  const noTeamMusic = await noTeamYet.trigger('player:team_music_play', { videoId: 'abc123', positionSec: 0 });
+  assert(noTeamMusic.error, 'player:team_music_play rejected for a player not yet on any team');
+
+  const tm1 = newConnection('tm1'); await tm1.trigger('player:join', { nickname: 'Mila', roomCode: roomCode11 });
+  const tm2 = newConnection('tm2'); await tm2.trigger('player:join', { nickname: 'Nino', roomCode: roomCode11 });
+  const tm3 = newConnection('tm3'); await tm3.trigger('player:join', { nickname: 'Oleh', roomCode: roomCode11 });
+  await adminSock.trigger('admin:assign_teams', { roomCode: roomCode11, numTeams: 2 });
+  const room11 = roomManager.getRoom(roomCode11);
+  const milaTeam = room11.players.get('mila').teamId;
+  // force Nino onto Mila's team and Oleh onto the other, regardless of how the snake draft split them, so the isolation check below is deterministic
+  const otherTeam11 = room11.teams.find(t => t.id !== milaTeam).id;
+  await adminSock.trigger('admin:move_player_to_team', { roomCode: roomCode11, nicknameKey: 'nino', teamId: milaTeam });
+  await adminSock.trigger('admin:move_player_to_team', { roomCode: roomCode11, nicknameKey: 'oleh', teamId: otherTeam11 });
+
+  const playRes = await tm1.trigger('player:team_music_play', { videoId: 'dQw4w9WgXcQ', positionSec: 0 });
+  assert(playRes.ok, 'player:team_music_play succeeds for a player on a real team');
+  assert(room11.teamMusic[milaTeam].videoId === 'dQw4w9WgXcQ' && room11.teamMusic[milaTeam].isPlaying === true, 'server-side teamMusic state actually recorded as playing');
+
+  const teammateBroadcast = tm2.lastReceived('team_music:state');
+  assert(teammateBroadcast && teammateBroadcast.state && teammateBroadcast.state.videoId === 'dQw4w9WgXcQ', 'the TEAMMATE (different socket) received the team_music:state broadcast -- proves cross-device sync, not just local playback');
+  const selfBroadcast = tm1.lastReceived('team_music:state');
+  assert(selfBroadcast && selfBroadcast.state.isPlaying === true, 'the actor\'s own socket also receives the broadcast (single code path for everyone)');
+  const rivalTeamBroadcast = tm3.lastReceived('team_music:state');
+  assert(!rivalTeamBroadcast, 'a player on the OTHER team never receives this team\'s music broadcast (same isolation guarantee as voice chat)');
+
+  const pauseRes = await tm2.trigger('player:team_music_pause', { positionSec: 12.5 });
+  assert(pauseRes.ok, 'a DIFFERENT teammate (not the one who started it) can pause the shared track');
+  assert(room11.teamMusic[milaTeam].isPlaying === false && room11.teamMusic[milaTeam].positionSec === 12.5, 'pause recorded the correct paused position server-side');
+
+  const stopRes = await tm1.trigger('player:team_music_stop', {});
+  assert(stopRes.ok && room11.teamMusic[milaTeam] === null, 'player:team_music_stop clears the shared state entirely');
+
+  const pub11 = roomManager.publicState(room11);
+  assert(pub11.teamMusic && Object.prototype.hasOwnProperty.call(pub11.teamMusic, milaTeam), 'publicState() exposes teamMusic so a reconnecting player can catch up mid-song');
+
   console.log('');
   const failed = assertions.filter(a => !a.cond);
   console.log('=== ' + (assertions.length - failed.length) + '/' + assertions.length + ' assertions passed ===');

@@ -58,6 +58,7 @@ class Room {
     this.currentTurnPos = 0;
     this.activeQuestion = null; // { themeId, price, openedAt, locked, timer }
     this.lastResolvedAnswer = null; // for admin override grace window
+    this.teamMusic = {}; // teamId -> { videoId, isPlaying, positionSec, updatedAt } | null -- see setTeamMusic()
   }
 }
 
@@ -273,6 +274,38 @@ class RoomManager {
     return { player };
   }
 
+  /**
+   * dima's point 7: teammates on separate devices ("грають на відстані")
+   * should hear the SAME track in sync, not just whoever has the panel open
+   * on one shared screen (the earlier local-only design). The server holds
+   * one authoritative {videoId, isPlaying, positionSec, updatedAt} per team;
+   * every team member's client reconciles its own local YouTube player
+   * against this (positionSec + elapsed-since-updatedAt when isPlaying) --
+   * see socketHandlers.js's broadcastTeamMusic and player.js's
+   * applyTeamMusicState. teamId comes from the caller's own roster entry
+   * (never a client-supplied target), same server-is-truth pattern as
+   * voice:join/useHint, so a player can only ever drive their OWN team's music.
+   */
+  setTeamMusic(room, teamId, { videoId, isPlaying, positionSec }) {
+    const team = room.teams.find(t => t.id === teamId);
+    if (!team) return { error: 'Команду не знайдено' };
+    const state = {
+      videoId: videoId || null,
+      isPlaying: !!isPlaying,
+      positionSec: Math.max(0, Number(positionSec) || 0),
+      updatedAt: Date.now()
+    };
+    room.teamMusic[teamId] = state;
+    room.updatedAt = Date.now();
+    return { state };
+  }
+
+  clearTeamMusic(room, teamId) {
+    room.teamMusic[teamId] = null;
+    room.updatedAt = Date.now();
+    return { ok: true };
+  }
+
   // ---- board / rounds ----
 
   generateBoard(room, { numRounds, themesPerRound } = {}) {
@@ -383,18 +416,62 @@ class RoomManager {
       price,
       type: question.type,
       clue: publicClue,
-      timeoutMs: config.ANSWER_TIMEOUT_MS
+      timeoutMs: config.ANSWER_TIMEOUT_MS,
+      hintUsed: false // flips to true via useHint() below; kept on the payload so a
+      // reconnecting client (which is handed this same object, see publicState())
+      // knows the hint button should already be spent for this question.
     };
 
     const timer = setTimeout(() => onTimeout(room), config.ANSWER_TIMEOUT_MS);
     // openedPayload is kept on activeQuestion (not just returned) so that a
     // player who reconnects/refreshes mid-question -- publicState() below --
     // can be shown the clue immediately instead of just a bare board with no
-    // way to answer until the timeout eventually fires.
-    room.activeQuestion = { themeId, price, openedAt: Date.now(), locked: false, timer, openedPayload };
+    // way to answer until the timeout eventually fires. onTimeout/totalMs are
+    // also kept here (not just closed over locally) so useHint() can later
+    // reschedule the SAME timeout callback against an extended duration.
+    room.activeQuestion = { themeId, price, openedAt: Date.now(), locked: false, timer, openedPayload, onTimeout, totalMs: config.ANSWER_TIMEOUT_MS, hintUsed: false };
     room.updatedAt = Date.now();
 
     return openedPayload;
+  }
+
+  /**
+   * "Купити підказку у адміна" (dima's point 5): the active team can spend
+   * HINT_COST_RATIO of the open question's price out of their OWN team score
+   * to buy 15 extra seconds (HINT_EXTRA_MS) on the answer clock -- a
+   * lifeline, not a real hint's content (there's no separate hint text in
+   * the data model), matching how dima described it: pay points, the game
+   * "stops" (extends) for 15s so the team has more time to think/discuss.
+   * Capped at once per question via activeQuestion.hintUsed. teamId MUST be
+   * derived server-side from the caller's own roster entry (same
+   * server-is-truth pattern as pickQuestion/voice:join) so a player can never
+   * spend a hint on behalf of a team they're not on.
+   */
+  useHint(room, teamId, themeId, price) {
+    if (room.status !== 'in_progress') return { error: 'Гра ще не почалась' };
+    const active = room.activeQuestion;
+    if (!active || active.themeId !== themeId || active.price !== price) {
+      return { error: 'Це питання вже не активне' };
+    }
+    if (this.getActiveTeamId(room) !== teamId) return { error: 'Зараз не хід вашої команди' };
+    if (active.hintUsed) return { error: 'Підказку для цього питання вже використано' };
+
+    const team = room.teams.find(t => t.id === teamId);
+    if (!team) return { error: 'Команду не знайдено' };
+    const cost = Math.round(price * config.HINT_COST_RATIO);
+
+    clearTimeout(active.timer);
+    const extraMs = config.HINT_EXTRA_MS;
+    active.totalMs += extraMs;
+    const msRemaining = Math.max(0, active.totalMs - (Date.now() - active.openedAt));
+    active.timer = setTimeout(() => active.onTimeout(room), msRemaining);
+
+    team.score -= cost;
+    active.hintUsed = true;
+    active.openedPayload.hintUsed = true;
+    room.updatedAt = Date.now();
+
+    return { cost, extraMs, msRemaining, totalMs: active.totalMs, team };
   }
 
   /** Shared by both real answers and timeouts. wasCorrect may be computed or forced false. */
@@ -524,6 +601,7 @@ class RoomManager {
       })),
       currentRoundIndex: room.currentRoundIndex,
       activeTeamId: this.getActiveTeamId(room),
+      teamMusic: room.teamMusic || {}, // teamId -> state|null, see setTeamMusic() doc comment
       // Include the full clue (not just themeId/price) so a player who
       // reconnects or refreshes mid-question can be shown the answer panel
       // right away instead of being stuck looking at a plain board until
@@ -532,7 +610,9 @@ class RoomManager {
         themeId: room.activeQuestion.themeId,
         price: room.activeQuestion.price,
         openedPayload: room.activeQuestion.openedPayload,
-        msRemaining: Math.max(0, config.ANSWER_TIMEOUT_MS - (Date.now() - room.activeQuestion.openedAt))
+        // totalMs grows when useHint() extends the clock, so a reconnecting
+        // client sees the correct remaining time instead of the original 45s.
+        msRemaining: Math.max(0, (room.activeQuestion.totalMs || config.ANSWER_TIMEOUT_MS) - (Date.now() - room.activeQuestion.openedAt))
       } : null
     };
   }

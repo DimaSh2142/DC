@@ -11,6 +11,7 @@
   let timerHandle = null;
   let resultClearHandle = null;
   let answerLocked = false; // guards against double-submit (e.g. two clicks on a logo option)
+  let hintRequestPending = false; // guards against double-clicking "buy a hint" while awaiting the server's ack
   let scoreFlash = null; // { teamId, delta } -- briefly pulses a team pill + shows a floating +/-N after a score change
   let scoreFlashHandle = null;
 
@@ -423,6 +424,31 @@
       ]));
     }
 
+    // dima's point 5: the active team can spend half the question's price
+    // (from their own team score) to buy 15 extra answer-clock seconds.
+    // Only shown to the team currently answering, same scoping as the
+    // answer form below -- and only before it's been spent once already.
+    if (isMyTurn() && stillOpenOnServer) {
+      const hintCost = Math.round(activeClue.price / 2);
+      if (activeClue.hintUsed) {
+        panel.appendChild(el('p', { class: 'hint-used-note', style: 'font-size:12px; opacity:.7; margin-top:8px;' }, ['Підказку для цього питання вже використано.']));
+      } else {
+        panel.appendChild(el('button', {
+          class: 'btn-outline', style: 'margin-top:10px; width:100%;',
+          disabled: hintRequestPending ? 'disabled' : null,
+          onclick: () => {
+            if (hintRequestPending || !activeClue) return;
+            hintRequestPending = true;
+            socket.emit('player:use_hint', { themeId: activeClue.themeId, price: activeClue.price }, (res) => {
+              hintRequestPending = false;
+              if (res && res.error) toast(res.error, true);
+              render();
+            });
+          }
+        }, ['\u{1F4A1} Підказка у адміна (−' + hintCost + ' команді, +15с)']));
+      }
+    }
+
     if (activeClue.type === 'select') {
       const grid = el('div', { class: 'logo-grid' }, activeClue.clue.options.map(opt =>
         el('div', { class: 'logo-option', html: opt.svg, onclick: (e) => {
@@ -622,52 +648,104 @@
   }
 
   // ---------------- team music (dima's ask: each team can play its own
-  // background/thinking music) ----------------
-  // Same "local device, not streamed over the socket" model as the admin's
-  // host-music panel in admin.js -- whichever device opens this plays it
-  // from ITS OWN speakers, for whoever is physically near that screen (e.g.
-  // the one phone/laptop a team is huddled around). Deliberately not synced
-  // across a team's separate devices over the network -- see PROGRESS.md.
-  let teamMusicUrlDraft = '';
+  // background/thinking music, point 7 -- teammates on SEPARATE devices,
+  // "навіть якщо грають на відстані", must hear the same track in sync) ----
+  // The server (roomManager.setTeamMusic) holds one authoritative
+  // {videoId, isPlaying, positionSec, updatedAt} per team; every team
+  // member's own device still plays audio from ITS OWN speakers via its own
+  // hidden YouTube iframe (so this genuinely plays out loud on each screen),
+  // but all of them reconcile to the same track/position instead of only
+  // whoever happens to have the panel open locally. lastKnownTeamMusicSignature
+  // guards against reacting to every incidental room:state broadcast (any
+  // player joining/answering triggers one) -- we only touch local playback
+  // when the team's music actually changed.
   const teamYtHost = document.createElement('div');
   teamYtHost.id = 'ytTeamMusicPlayer';
   teamYtHost.style.cssText = 'position:absolute; width:1px; height:1px; visibility:hidden;';
   document.body.appendChild(teamYtHost);
+  let teamMusicUrlDraft = '';
   let teamYtPlayer = null;
   let teamYtLoadedVideoId = null;
+  let lastKnownTeamMusicSignature = null;
   startMusicProgressTicker(() => teamYtPlayer, 'teamMusicFill', 'teamMusicLabel');
 
+  function currentTeamMusicState() {
+    const teamId = myTeamId();
+    return (teamId && roomState && roomState.teamMusic && roomState.teamMusic[teamId]) || null;
+  }
+
+  // Actions just ask the server to update the shared state -- actual local
+  // playback always happens in applyTeamMusicState(), driven by the
+  // team_music:state broadcast the actor receives back too (single code
+  // path for everyone, including yourself; see socketHandlers.js).
   function playTeamMusicUrl(rawUrl) {
     const id = extractYouTubeId(rawUrl);
     if (!id) return toast('Не вдалося розпізнати посилання YouTube', true);
+    socket.emit('player:team_music_play', { videoId: id, positionSec: 0 }, (res) => { if (res && res.error) toast(res.error, true); });
+  }
+  function pauseTeamMusic() {
+    const posSec = (teamYtPlayer && teamYtPlayer.getCurrentTime && teamYtPlayer.getCurrentTime()) || 0;
+    socket.emit('player:team_music_pause', { positionSec: posSec }, (res) => { if (res && res.error) toast(res.error, true); });
+  }
+  function stopTeamMusic() {
+    socket.emit('player:team_music_stop', {}, (res) => { if (res && res.error) toast(res.error, true); });
+  }
+
+  function stopTeamMusicLocal() {
+    if (teamYtPlayer && teamYtPlayer.stopVideo) teamYtPlayer.stopVideo();
+    teamYtLoadedVideoId = null;
+  }
+
+  // Reconciles THIS device's hidden player against the server's shared
+  // state. When isPlaying, positionSec is "as of updatedAt" -- add elapsed
+  // wall-clock time so a late join/reconnect catches up mid-song instead of
+  // restarting it from 0, same idea as activeQuestion's msRemaining.
+  function applyTeamMusicState(musicState) {
+    if (!musicState || !musicState.videoId) { stopTeamMusicLocal(); return; }
+    const elapsedSec = musicState.isPlaying ? Math.max(0, (Date.now() - musicState.updatedAt) / 1000) : 0;
+    const targetSec = musicState.positionSec + elapsedSec;
     ensureYouTubeApi(() => {
       if (!teamYtPlayer) {
-        teamYtLoadedVideoId = id;
+        teamYtLoadedVideoId = musicState.videoId;
         teamYtPlayer = new YT.Player('ytTeamMusicPlayer', {
-          height: '1', width: '1', videoId: id,
-          playerVars: { autoplay: 1, controls: 0 },
-          events: { onReady: (e) => e.target.playVideo() }
+          height: '1', width: '1', videoId: musicState.videoId,
+          playerVars: { autoplay: musicState.isPlaying ? 1 : 0, controls: 0, start: Math.floor(targetSec) },
+          events: { onReady: (e) => { if (musicState.isPlaying) e.target.playVideo(); else e.target.pauseVideo(); } }
         });
-      } else if (id === teamYtLoadedVideoId) {
-        teamYtPlayer.playVideo(); // resume from the same paused position, no reload
-      } else {
-        teamYtLoadedVideoId = id;
-        teamYtPlayer.loadVideoById(id);
-        teamYtPlayer.playVideo();
+        return;
       }
+      if (musicState.videoId !== teamYtLoadedVideoId) {
+        teamYtLoadedVideoId = musicState.videoId;
+        teamYtPlayer.loadVideoById(musicState.videoId, targetSec);
+      } else if (typeof teamYtPlayer.seekTo === 'function') {
+        teamYtPlayer.seekTo(targetSec, true);
+      }
+      if (musicState.isPlaying) teamYtPlayer.playVideo(); else teamYtPlayer.pauseVideo();
     });
   }
-  function pauseTeamMusic() { if (teamYtPlayer && teamYtPlayer.pauseVideo) teamYtPlayer.pauseVideo(); }
-  function stopTeamMusic() { if (teamYtPlayer && teamYtPlayer.stopVideo) teamYtPlayer.stopVideo(); teamYtLoadedVideoId = null; }
+
+  // Called from the same places syncActiveQuestion()/syncVoiceTeam() are --
+  // initial rejoin and every room:state broadcast -- but only actually
+  // touches playback when the signature (track + play/pause) changed.
+  function syncTeamMusic(state) {
+    const teamId = myTeamId();
+    const musicState = teamId && state.teamMusic && state.teamMusic[teamId];
+    const signature = musicState && musicState.videoId ? (musicState.videoId + ':' + musicState.isPlaying) : 'none';
+    if (signature === lastKnownTeamMusicSignature) return;
+    lastKnownTeamMusicSignature = signature;
+    applyTeamMusicState(musicState);
+  }
 
   function renderTeamMusicPanel() {
     if (!myTeamId()) return null;
+    const musicState = currentTeamMusicState();
+    const statusText = musicState && musicState.videoId ? (musicState.isPlaying ? '▶ Грає для всієї команди' : '⏸ На паузі (для всієї команди)') : 'Нічого не грає';
     const urlInput = el('input', {
       type: 'text', placeholder: 'Посилання на YouTube...', value: teamMusicUrlDraft,
       oninput: (e) => { teamMusicUrlDraft = e.target.value; }
     });
     return el('div', { class: 'card', style: 'margin:14px 0; padding:14px 18px;' }, [
-      el('div', { class: 'row between' }, [el('strong', {}, ['\u{1F3B5} Музика команди'])]),
+      el('div', { class: 'row between' }, [el('strong', {}, ['\u{1F3B5} Музика команди']), el('span', { class: 'badge outline' }, [statusText])]),
       el('div', { class: 'field', style: 'margin-top:8px;' }, [urlInput]),
       el('div', { class: 'row' }, [
         el('button', { type: 'button', class: 'btn-small', onclick: () => playTeamMusicUrl(urlInput.value) }, ['▶ Грати']),
@@ -677,7 +755,7 @@
       el('div', { class: 'timer-bar', style: 'margin-top:10px;' }, [el('div', { class: 'timer-bar-fill', id: 'teamMusicFill', style: 'background:var(--turquoise);' })]),
       el('div', { id: 'teamMusicLabel', style: 'font-size:12px; font-weight:700; color:var(--turquoise-dark);' }, ['0:00 / 0:00']),
       el('p', { style: 'font-size:12px; margin:6px 0 0; color:var(--turquoise-dark);' },
-        ['Грає з колонок цього пристрою -- тільки для вас/тих, хто поруч із цим екраном. Пауза зберігає позицію -- «Грати» продовжить з того ж місця.'])
+        ['Синхронізовано для всієї команди -- кожен чує зі своїх колонок, навіть якщо ви граєте на відстані. Пауза зберігає позицію для всіх.'])
     ]);
   }
 
@@ -735,7 +813,7 @@
   socket.on('connect', () => {
     if (joined && me.nickname && me.roomCode) {
       socket.emit('player:join', { nickname: me.nickname, roomCode: me.roomCode }, (res) => {
-        if (!res.error) { roomState = res.room; syncActiveQuestion(res.room); syncVoiceTeam(); render(); }
+        if (!res.error) { roomState = res.room; syncActiveQuestion(res.room); syncTeamMusic(res.room); syncVoiceTeam(); render(); }
       });
     }
   });
@@ -745,7 +823,19 @@
     if (state.code !== me.roomCode) return;
     roomState = state;
     syncActiveQuestion(state);
+    syncTeamMusic(state);
     syncVoiceTeam();
+    render();
+  });
+
+  // dima's point 7: the server only targets our own team's sockets (see
+  // broadcastTeamMusic), so this always reflects OUR team's shared state.
+  socket.on('team_music:state', (payload) => {
+    if (!roomState || payload.code !== roomState.code) return;
+    if (!roomState.teamMusic) roomState.teamMusic = {};
+    roomState.teamMusic[payload.teamId] = payload.state;
+    lastKnownTeamMusicSignature = payload.state && payload.state.videoId ? (payload.state.videoId + ':' + payload.state.isPlaying) : 'none';
+    applyTeamMusicState(payload.state);
     render();
   });
 
@@ -786,6 +876,18 @@
   socket.on('answer:corrected', () => { toast('Адмін скоригував останню відповідь'); });
   socket.on('game:started', () => { toast('Гру розпочато! Хід визначено.'); });
   socket.on('teams:rebalanced', () => { toast('Команди перебалансовано адміном'); });
+
+  // dima's point 5: broadcast to the WHOLE room (both teams see the clock
+  // change, not just the team that paid) -- mirrors admin.js's handling.
+  socket.on('hint:used', (payload) => {
+    if (!roomState || payload.code !== roomState.code) return;
+    if (activeClue && activeClue.themeId === payload.themeId && activeClue.price === payload.price) {
+      activeClue.hintUsed = true;
+      startTimer(Math.max(1000, payload.msRemaining || 15000));
+    }
+    toast('Команда «' + ((teamById(payload.teamId) || {}).name || '') + '» купила підказку (−' + payload.cost + '), +15с на таймер');
+    render();
+  });
 
   render();
 })();
