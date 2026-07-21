@@ -418,7 +418,6 @@ th { color: var(--turquoise-dark); }
 /* ---- roster/score-adjust panel (host controls) ---- */
 .roster-list { max-height: 380px; overflow-y: auto; padding-right: 4px; }
 .player-row-controls { display: flex; align-items: center; gap: 6px; }
-.score-adjust-input { width: 56px; padding: 6px 8px; font-size: 13px; }
 .team-score-adjust { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .warn-banner {
   background: var(--orange-light);
@@ -553,7 +552,16 @@ th { color: var(--turquoise-dark); }
   --hub-surface-border: rgba(230, 247, 245, 0.14);
   --hub-text: #EAF6F4;
   --hub-text-dim: rgba(234, 246, 244, 0.62);
-  flex: 1;
+  /* НЕ flex:1 -- .hub-page тут єдина дитина body (яке display:flex;
+     min-height:100vh, спільне для всього сайту). flex:1 (== flex-basis:0%)
+     разом з overflow:hidden нижче вмикає CSS-квірк "automatic minimum size"
+     (overflow != visible прибирає захист від стиснення нижче розміру
+     контенту) -- разом вони стискали .hub-page рівно до висоти вьюпорта й
+     ОБРІЗАЛИ каталог/футер нижче замість того щоб дати сторінці скролитись
+     (dima: "сайт навіть вниз не гортається"). Той самий підхід що .ds-page
+     нижче у файлі -- своя явна min-height:100vh замість flex-grow -- це і
+     працює на тих сторінках без цього бага. */
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -562,23 +570,29 @@ th { color: var(--turquoise-dark); }
   position: relative;
   text-align: center;
   user-select: none;
-  overflow: hidden;
+  overflow-x: hidden;
   background:
     radial-gradient(ellipse 900px 500px at 50% -10%, rgba(23, 184, 166, 0.16), transparent 60%),
     var(--hub-obsidian);
   color: var(--hub-text);
 }
 
-/* floating blurred spheres -- pure CSS, no canvas/JS needed */
+/* floating blurred spheres -- pure CSS, no canvas/JS needed.
+   s2 (crimson) навмисно нижче й тьмяніше, ніж у першій версії -- раніше він
+   сидів (top:140px) майже впритул до hero-заголовка й його розмите гало
+   (blur:70px, opacity:.45) буквально бляднуло просто по літерах "Land",
+   через що чистий crimson->orange градієнт тексту виглядав на скріні
+   замиленим у рожевий/магента -- dima: "подивись уважно на кольори". Текст
+   і сфери тепер розведені по вертикалі, щоб градієнт читався чисто. */
 .hub-bg-spheres { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.hub-sphere { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .45; will-change: transform; }
+.hub-sphere { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .35; will-change: transform; }
 .hub-sphere.s1 {
-  width: 380px; height: 380px; left: -100px; top: -80px;
+  width: 380px; height: 380px; left: -120px; top: -140px;
   background: radial-gradient(circle, var(--turquoise) 0%, transparent 70%);
   animation: hub-drift-1 22s ease-in-out infinite alternate;
 }
 .hub-sphere.s2 {
-  width: 320px; height: 320px; right: -80px; top: 140px;
+  width: 320px; height: 320px; right: -100px; top: 380px;
   background: radial-gradient(circle, var(--crimson) 0%, transparent 70%);
   animation: hub-drift-2 26s ease-in-out infinite alternate;
 }
@@ -610,14 +624,10 @@ th { color: var(--turquoise-dark); }
 .hub-cabinet-btn:hover { transform: translateY(-2px); border-color: var(--turquoise); box-shadow: 0 8px 26px rgba(23,184,166,.25); }
 .hub-cabinet-btn-icon { font-size: 16px; }
 
-/* hero: real logo (kept!) + neon gradient "DSLand" wordmark */
-.hub-hero { position: relative; z-index: 2; margin-top: 26px; display: flex; flex-direction: column; align-items: center; }
-.hub-logo-glow {
-  width: 220px; max-width: 58vw; height: auto;
-  border-radius: 28px;
-  margin-bottom: 20px;
-  box-shadow: 0 0 0 1.5px rgba(230,247,245,.18), 0 20px 60px rgba(23,184,166,.35), 0 10px 34px rgba(215,38,61,.18);
-}
+/* hero: neon gradient "DSLand" wordmark (лого прибрано з hero за проханням
+   dima 2026-07-21 -- логотип-картинка лишається у фавіконці й на самій
+   вікторині quiz.html, тут тепер лише текст, як у скріні-референсі). */
+.hub-hero { position: relative; z-index: 2; margin-top: 40px; display: flex; flex-direction: column; align-items: center; }
 .hub-title-neon {
   margin: 0;
   font-weight: 900;
@@ -677,7 +687,6 @@ th { color: var(--turquoise-dark); }
 
 @media (max-width: 480px) {
   .hub-title-neon { font-size: 42px; }
-  .hub-logo-glow { width: 150px; }
   .hub-topbar { justify-content: center; }
 }
 
@@ -744,13 +753,6 @@ th { color: var(--turquoise-dark); }
 /* "Речі на вивід" (2026-07-21 scaffolding for future Казино lootbox winnings
    -- the case-opening mechanic itself doesn't exist yet, so this is almost
    always just the empty state for now). */
-.items-panel {
-  background: var(--white);
-  border: 2px solid var(--turquoise-light);
-  border-radius: var(--radius);
-  padding: 14px 18px;
-  margin-bottom: 22px;
-}
 .items-empty { font-size: 13px; color: var(--turquoise-dark); }
 .items-list { display: flex; flex-wrap: wrap; gap: 10px; }
 .item-card {
@@ -830,7 +832,6 @@ input[type="range"] {
   background: linear-gradient(160deg, #0B1917 0%, var(--turquoise-ink) 55%, var(--crimson-dark) 130%);
 }
 .casino-hero-content { position: relative; z-index: 1; }
-.casino-back-link.back-link { color: var(--turquoise-light); margin-bottom: 6px; }
 .casino-snow-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
 .casino-snowflake {
   position: absolute;
@@ -849,7 +850,6 @@ input[type="range"] {
 .casino-coin-wrap { margin: 6px 0 12px; }
 .casino-title { font-size: 28px; margin: 4px 0 6px; }
 .casino-accent-gold { color: var(--orange); }
-.casino-tagline { color: var(--turquoise-light); font-size: 14px; margin: 0 0 16px; }
 .casino-kkoin-badge {
   display: inline-flex;
   align-items: center;
@@ -894,8 +894,6 @@ input[type="range"] {
 .bship-cell.miss { background: var(--turquoise-light); color: var(--turquoise-dark); }
 .bship-cell.hit { background: var(--crimson); color: var(--white); }
 .bship-cell.sunk { background: var(--crimson-dark); color: var(--white); }
-.bship-cell.preview { background: var(--orange-light); border: 2px solid var(--orange); }
-.bship-cell.preview-invalid { background: var(--crimson-light); border: 2px solid var(--crimson); }
 
 .checkers-grid {
   display: grid;
@@ -1207,7 +1205,6 @@ input[type="range"] {
 .ds-stat-row:last-child { border-bottom: none; }
 .ds-stat-row span:last-child { color: var(--ds-text); font-weight: 800; }
 
-.ds-balance-row { display: flex; align-items: center; gap: 16px; }
 .ds-balance-amount { font-size: 26px; font-weight: 900; color: var(--ds-text); }
 .ds-balance-label { font-size: 12px; color: var(--ds-text-dim); line-height: 1.5; margin-top: 4px; }
 .ds-page .kkoin-add-btn { background: var(--orange); color: #241100; box-shadow: none; }
@@ -1219,7 +1216,6 @@ input[type="range"] {
 .ds-page .tabs button { background: var(--ds-surface-strong); color: var(--ds-text-dim); border: 1.5px solid var(--ds-border); font-size: 12px; font-weight: 800; letter-spacing: .5px; }
 .ds-page .tabs button.active { background: var(--ds-mint); color: #04140D; border-color: var(--ds-mint); }
 .ds-page .locked-banner { background: rgba(215,38,61,.12); border: 1.5px solid rgba(215,38,61,.4); color: #ff8b98; }
-.ds-page .admin-grant-panel-note { color: var(--ds-text-dim); }
 
 /* ============================================================================
    KKrampus coin -- справжня 3D монета-переверталка (2026-07-21, dima дав
@@ -1248,3 +1244,52 @@ input[type="range"] {
 .kcoin-back span { font-weight: 900; color: #78350f; line-height: 1; }
 @keyframes kcoin-spin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
 @media (prefers-reduced-motion: reduce) { .kcoin-inner { animation: none; } }
+
+/* ==============================================================
+   Темна оболонка для ЖИВИХ ігрових сторінок -- гравець (вікторина),
+   адмін-панель, Морський бій, Шашки, Шахи, Бульбашки (2026-07-21,
+   dima підтвердив: "перефарбовуй всі ігри", після index/minigames/
+   profile/casino/quiz). На відміну від .hub-page/.ds-page (де весь
+   layout переписаний під новий дизайн з нуля), тут ми НАВМИСНО
+   перефарбовуємо лише семантичні --bg/--surface/--text/--shadow --
+   а НЕ --turquoise-light/--crimson-light/--orange-light -- бо
+   .checkers-cell.light/.chess-cell.light буквально дорівнюють
+   background:var(--turquoise-light), тобто це не просто тон
+   панелі, а колір СВІТЛОЇ клітинки дошки. Перефарбувати цю змінну
+   означало б зробити світлі клітинки темними -- дошка втратила б
+   контраст і стала б нечитабельною. Завдяки тому що вся розмітка
+   (.card/.badge/button/input) вже побудована на --bg/--surface/
+   --text/--shadow, вона автоматично стає темною без жодної зміни в
+   JS чи HTML цих сторінок -- лише один новий клас на <body>.
+   ============================================================== */
+body.ds-dark-body {
+  --bg: #0A0E16;
+  --surface: rgba(230, 247, 245, 0.05);
+  --text: #EAF6F4;
+  --shadow: rgba(0, 0, 0, 0.45);
+  background:
+    radial-gradient(ellipse 900px 480px at 15% -10%, rgba(23,184,166,.12), transparent 60%),
+    radial-gradient(ellipse 700px 420px at 100% 10%, rgba(215,38,61,.08), transparent 60%),
+    #0A0E16;
+}
+/* .card/.center-screen мають свій напівпрозорий фон/тінь, тому лишаємо їх на
+   z-index за замовчуванням -- декоративних сфер тут немає (на відміну від
+   hub/ds-сторінок), щоб не відволікати під час самої гри. */
+
+/* --turquoise-dark/--crimson-dark/--orange-dark й далі використовуються як
+   колір ТЕКСТУ у кількох місцях (label, .badge.outline, button.btn-outline),
+   що при світлому фоні виглядало як темний напис на світлій панелі -- на
+   новому темному --surface це стало б темним по темному й нечитабельним.
+   Ці змінні НЕ займаємо (той самий --turquoise-dark -- ще й колір темної
+   клітинки в шашках/шахах, займати не можна), тому просто перекриваємо
+   колір ТЕКСТУ саме в цих конкретних місцях, тільки в межах .ds-dark-body. */
+body.ds-dark-body label,
+body.ds-dark-body .badge.outline,
+body.ds-dark-body button.btn-outline,
+body.ds-dark-body .tabs button {
+  color: var(--text);
+  opacity: .82;
+}
+body.ds-dark-body button.btn-outline.crimson { color: #ff8b98; opacity: 1; }
+body.ds-dark-body button.btn-outline.orange { color: var(--orange); opacity: 1; }
+body.ds-dark-body .room-code { color: #ff5c72; }
