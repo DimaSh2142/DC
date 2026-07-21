@@ -634,7 +634,28 @@ th { color: var(--turquoise-dark); }
    суцільні кольори (червоний/синій), НЕ спільний turquoise->orange градієнт
    як було раніше -- в оригіналі взагалі немає жовтогарячого чи бірюзового в
    вордмарці. "Land" -- градієнт magenta->pink, теж з оригіналу. */
-.hub-hero { position: relative; z-index: 2; margin-top: 40px; display: flex; flex-direction: column; align-items: center; }
+/* dima 2026-07-22 (скрін 3 vs реальний base44): hero раніше був стиснутий у
+   розмір самого контенту (заголовок+підзаголовок і все) -- у референсі ж
+   секція hero явно min-h-[88vh], займає майже весь перший екран, і САМЕ
+   тому там є сенс у "scroll hint" стрілці внизу. Без такої висоти сторінка
+   виглядає "втиснутою в один екран" навіть коли технічно й скролиться --
+   це і є те, що dima показав на 3-му скріні поруч з референсом. */
+.hub-hero {
+  position: relative; z-index: 2;
+  width: 100%;
+  min-height: 82vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 20px 20px 70px;
+}
+.hub-scroll-hint {
+  position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+  width: 24px; height: 40px; border-radius: 99px;
+  border: 1.5px solid var(--hub-surface-border);
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 6px;
+}
+.hub-scroll-hint-dot { width: 4px; height: 8px; border-radius: 99px; background: #00FFD1; animation: hub-scroll-bounce 1.8s ease-in-out infinite; }
+@keyframes hub-scroll-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { .hub-scroll-hint-dot { animation: none; } }
 .hub-eyebrow {
   display: flex; align-items: center; gap: 12px;
   font-size: 11px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase;
@@ -663,14 +684,30 @@ th { color: var(--turquoise-dark); }
 }
 .hub-page .hub-tagline { color: var(--hub-text-dim); margin: 10px 0 0; font-size: 16px; font-weight: 500; }
 
-/* catalog: "Три світи. Безліч шляхів." glass card grid (замінює старий рядок з 3 кнопок) */
-.hub-catalog { position: relative; z-index: 2; width: 100%; max-width: 1000px; margin-top: 54px; }
-.hub-catalog-title { font-size: 26px; font-weight: 800; color: var(--hub-text); margin-bottom: 26px; }
+/* catalog: "Три світи. Безліч шляхів." glass card grid (замінює старий рядок з 3 кнопок).
+   dima 2026-07-22: секція раніше мала лише margin-top:54px -- у референсі
+   (GameMatrix.jsx) це py-24 sm:py-32 (~96-128px згори й знизу) плюс окремий
+   "/ 01 -- Каталог" eyebrow і абзац-опис праворуч від заголовка. Додано те
+   саме тут, аби секція не виглядала притиснутою одразу під hero. */
+.hub-catalog { position: relative; z-index: 2; width: 100%; max-width: 1100px; padding: 90px 20px 40px; text-align: left; }
+.hub-catalog-header { display: flex; flex-direction: column; gap: 18px; margin-bottom: 56px; }
+.hub-catalog-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase;
+  color: #00FFD1;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  margin-bottom: 10px;
+}
+.hub-catalog-title { font-size: 32px; font-weight: 800; color: var(--hub-text); margin: 0; }
+.hub-catalog-desc { font-size: 14px; line-height: 1.6; color: var(--hub-text-dim); max-width: 380px; margin: 0; }
+@media (min-width: 720px) {
+  .hub-catalog-header { flex-direction: row; align-items: flex-end; justify-content: space-between; }
+}
 .hub-catalog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px; }
 .hub-card {
   position: relative;
   display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 6px;
-  padding: 26px 24px 24px;
+  padding: 36px 32px 32px;
+  min-height: 300px;
   border-radius: 20px;
   background: var(--hub-surface);
   border: 1.5px solid var(--hub-surface-border);
@@ -680,9 +717,9 @@ th { color: var(--turquoise-dark); }
   transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
 }
 .hub-card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(0,0,0,.4); }
-.hub-card-num { position: absolute; top: 18px; right: 22px; font-size: 34px; font-weight: 800; color: rgba(234,246,244,.14); }
-.hub-card-emoji { font-size: 40px; margin-bottom: 6px; }
-.hub-card-title { font-size: 20px; font-weight: 800; }
+.hub-card-num { position: absolute; top: 22px; right: 26px; font-size: 34px; font-weight: 800; color: rgba(234,246,244,.14); }
+.hub-card-emoji { font-size: 44px; margin: 10px 0 16px; }
+.hub-card-title { font-size: 28px; font-weight: 800; }
 .hub-card-sub { font-size: 13px; color: var(--hub-text-dim); margin-bottom: 14px; }
 .hub-card-play { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; letter-spacing: .5px; padding: 8px 16px; border-radius: 99rem; background: rgba(255,255,255,.06); }
 .hub-card-play .arrow { transition: transform .2s ease; }
