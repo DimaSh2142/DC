@@ -116,15 +116,12 @@ h1, h2, h3 { margin: 0 0 .4em 0; line-height: 1.2; }
 }
 .brand-title .accent { color: var(--crimson); }
 
-/* quiz.html's logo+"DSLand" header (dima 2026-07-21, screenshot 2: "виправи
-   щоб текст і логотип були рівненькими і гарними") -- previously a bare
-   inline <img> + <h1> inside a text-align:center card, which left the
-   (inline-by-default) logo sitting slightly off from the heading's center
-   line. A flex column, same technique as the homepage hub's .hub-hero,
-   guarantees both are centered on the same axis with even spacing. */
-.quiz-hero { display: flex; flex-direction: column; align-items: center; margin-bottom: 6px; }
-.quiz-hero-logo { width: 140px; height: auto; display: block; margin: 0 0 12px; }
-.quiz-hero-title { margin: 0; font-size: 34px; text-align: center; line-height: 1.15; }
+/* quiz.html's старий .quiz-hero (окремий логотип+заголовок над карткою)
+   прибраний 2026-07-21 -- сторінка тепер використовує спільний .ds-eyebrow/
+   .ds-heading зверху, той самий підхід, що на index/minigames/casino/
+   profile (dima: "повністю зроби сайт в цьому стилі"). .brand-title/.accent
+   вище НЕ видалені -- їх досі використовує player.js для екрану приєднання
+   гравця (renderJoin()), це окремі від .quiz-hero класи. */
 
 input[type="text"], input[type="password"], input[type="number"], select {
   font-size: 16px;
@@ -884,32 +881,9 @@ input[type="range"] {
 .casino-kkoin-label { font-weight: 600; font-size: 12px; color: var(--turquoise-light); }
 .casino-body { padding: 22px 24px 0; text-align: center; }
 
-/* ---- "Міні-ігри" hub (minigames.html) ---- */
-.mg-hub-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin: 18px 0;
-}
-@media (max-width: 560px) { .mg-hub-grid { grid-template-columns: 1fr; } }
-.mg-hub-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 4px;
-  padding: 18px 10px;
-  border-radius: var(--radius);
-  border: 2px solid var(--turquoise);
-  color: var(--turquoise-dark);
-  background: var(--surface);
-  transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s ease;
-}
-.mg-hub-card:hover { transform: translateY(-4px); box-shadow: 0 10px 26px var(--shadow); }
-.mg-hub-emoji { font-size: 34px; }
-.mg-hub-name { font-weight: 800; font-size: 15px; }
-.mg-hub-desc { font-size: 11px; opacity: .8; }
-.mg-hub-future { text-align: center; font-size: 12px; color: var(--turquoise-dark); opacity: .8; }
+/* ---- стара світла верстка "Міні-ігри" (mg-hub-*) прибрана 2026-07-21 --
+   minigames.html тепер використовує спільну темну систему .ds-* нижче у
+   файлі (dima: "повністю зроби сайт в цьому стилі"). ---- */
 
 /* ---- shared mini-game board grids (battleship/checkers/chess pages) ---- */
 .mg-boards-row { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
@@ -1085,3 +1059,181 @@ input[type="range"] {
 .btn-12:hover:before {
   --progress: 0;
 }
+
+/* ============================================================================
+   DSLand dark system v2 (2026-07-21, dima: ще 2 скріни -- хаб міні-ігор і
+   кабінет -- "повністю зроби сайт в цьому стилі і максимально гарний як на
+   скрінах"). Спільні перевикористовувані класи для КОЖНОЇ "хаб-подібної"
+   сторінки (minigames.html, profile.html, casino.html) -- той самий підхід,
+   що й .hub-page на index.html: --ds-* змінні оголошені локально на .ds-page,
+   а НЕ в :root, і НЕ пов'язані з existing [data-theme] перемикачем
+   світла/темна в налаштуваннях кабінету (той продовжує керувати рештою
+   сторінок на кшталт ігрових дощок незалежно від цього). ".ds-card--mint"
+   використовує ТОЙ САМИЙ зелений відтінок (#3DDC97), що й ONLINE-індикатор
+   у футері головної -- тобто це не 5й колір, а той самий новий акцент, що
+   вже з'явився в дизайні. ============================================== */
+.ds-page {
+  --ds-obsidian: #0A0E16;
+  --ds-surface: rgba(230, 247, 245, 0.05);
+  --ds-surface-strong: rgba(230, 247, 245, 0.08);
+  --ds-border: rgba(230, 247, 245, 0.14);
+  --ds-text: #EAF6F4;
+  --ds-text-dim: rgba(234, 246, 244, 0.6);
+  --ds-text-dimmer: rgba(234, 246, 244, 0.38);
+  --ds-mint: #3DDC97;
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  width: 100%;
+  padding: 26px 24px 40px;
+  background:
+    radial-gradient(ellipse 900px 480px at 15% -10%, rgba(23,184,166,.12), transparent 60%),
+    radial-gradient(ellipse 700px 420px at 100% 10%, rgba(215,38,61,.08), transparent 60%),
+    var(--ds-obsidian);
+  color: var(--ds-text);
+  text-align: left;
+  user-select: none;
+}
+.ds-shell { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; }
+.ds-shell-narrow { max-width: 640px; }
+
+.ds-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 34px; gap: 12px; flex-wrap: wrap; }
+.ds-page .ds-back-link.back-link { font-size: 13px; font-weight: 700; color: var(--ds-text-dim); margin: 0; }
+.ds-page .ds-back-link.back-link:hover { color: var(--ds-text); }
+.ds-brand-mark { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: var(--ds-text-dimmer); white-space: nowrap; }
+.ds-brand-mark b { color: var(--turquoise); font-weight: 800; }
+
+.ds-eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 3px; color: var(--turquoise); margin-bottom: 14px; text-transform: uppercase; }
+
+.ds-heading { font-size: 42px; font-weight: 900; line-height: 1.14; margin: 0 0 14px; letter-spacing: .2px; color: var(--ds-text); }
+.ds-heading-gradient {
+  background: linear-gradient(90deg, var(--grad-a, var(--turquoise)) 0%, var(--grad-b, var(--white)) 50%, var(--grad-c, var(--orange)) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.ds-heading-gradient.sunset { --grad-a: #ff5fa0; --grad-b: #17B8A6; --grad-c: #3DDC97; }
+.ds-heading-gradient.mint { --grad-a: var(--turquoise); --grad-b: #3DDC97; --grad-c: #3DDC97; }
+
+.ds-lede { color: var(--ds-text-dim); font-size: 15px; line-height: 1.55; max-width: 420px; margin: 0; }
+.ds-header-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 40px; }
+.ds-header-row .ds-lede-block { text-align: right; }
+@media (max-width: 760px) {
+  .ds-header-row { flex-direction: column; align-items: flex-start; }
+  .ds-header-row .ds-lede-block { text-align: left; }
+  .ds-lede { max-width: none; }
+  .ds-heading { font-size: 32px; }
+}
+
+.ds-tags { display: flex; gap: 10px; margin-top: 12px; justify-content: flex-end; flex-wrap: wrap; }
+@media (max-width: 760px) { .ds-tags { justify-content: flex-start; } }
+.ds-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--ds-text-dim); background: var(--ds-surface); border: 1px solid var(--ds-border); border-radius: 99rem; padding: 6px 14px; white-space: nowrap; }
+
+/* ---- card grid (minigames.html) ---- */
+.ds-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 20px; }
+.ds-card {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 22px 20px;
+  border-radius: 18px;
+  background: var(--ds-surface);
+  border: 1.5px solid var(--ds-border);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  color: var(--ds-text);
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.ds-card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(0,0,0,.4); }
+.ds-card-top { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 800; letter-spacing: 1px; color: var(--ds-text-dimmer); }
+.ds-card-play { font-weight: 900; letter-spacing: 1px; }
+.ds-card-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-top: 4px; }
+.ds-card-title { font-size: 18px; font-weight: 800; margin: 0; color: var(--ds-text); }
+.ds-card-subtitle { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin: -6px 0 0; }
+.ds-card-desc { font-size: 13px; color: var(--ds-text-dim); line-height: 1.5; flex: 1; margin: 0; }
+.ds-card-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+.ds-card-mode { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: var(--ds-text-dimmer); text-transform: uppercase; }
+.ds-card-arrow { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: transform .2s ease; flex-shrink: 0; }
+.ds-card:hover .ds-card-arrow { transform: rotate(45deg); }
+
+.ds-card--turquoise { border-color: rgba(23,184,166,.35); }
+.ds-card--turquoise:hover { border-color: var(--turquoise); box-shadow: 0 18px 40px rgba(23,184,166,.28); }
+.ds-card--turquoise .ds-card-icon { background: rgba(23,184,166,.16); color: var(--turquoise); }
+.ds-card--turquoise .ds-card-top, .ds-card--turquoise .ds-card-subtitle, .ds-card--turquoise .ds-card-arrow { color: var(--turquoise); }
+
+.ds-card--crimson { border-color: rgba(215,38,61,.35); }
+.ds-card--crimson:hover { border-color: var(--crimson); box-shadow: 0 18px 40px rgba(215,38,61,.28); }
+.ds-card--crimson .ds-card-icon { background: rgba(215,38,61,.16); color: #ff6b81; }
+.ds-card--crimson .ds-card-top, .ds-card--crimson .ds-card-subtitle, .ds-card--crimson .ds-card-arrow { color: #ff6b81; }
+
+.ds-card--orange { border-color: rgba(242,153,74,.35); }
+.ds-card--orange:hover { border-color: var(--orange); box-shadow: 0 18px 40px rgba(242,153,74,.28); }
+.ds-card--orange .ds-card-icon { background: rgba(242,153,74,.16); color: var(--orange); }
+.ds-card--orange .ds-card-top, .ds-card--orange .ds-card-subtitle, .ds-card--orange .ds-card-arrow { color: var(--orange); }
+
+.ds-card--mint { border-color: rgba(61,220,151,.35); }
+.ds-card--mint:hover { border-color: var(--ds-mint); box-shadow: 0 18px 40px rgba(61,220,151,.28); }
+.ds-card--mint .ds-card-icon { background: rgba(61,220,151,.16); color: var(--ds-mint); }
+.ds-card--mint .ds-card-top, .ds-card--mint .ds-card-subtitle, .ds-card--mint .ds-card-arrow { color: var(--ds-mint); }
+
+.ds-note { text-align: center; color: var(--ds-text-dimmer); font-size: 13px; margin: 44px 0 0; }
+
+/* ---- footer (shared across all .ds-page pages, live clock via /js/hub.js) ---- */
+.ds-footer { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--ds-border); font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--ds-text-dimmer); flex-wrap: wrap; gap: 10px; text-transform: uppercase; }
+.ds-footer-status { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- two-column panel layout (profile.html) ---- */
+.ds-grid-2 { display: grid; grid-template-columns: minmax(260px, 380px) 1fr; gap: 22px; align-items: start; }
+@media (max-width: 760px) { .ds-grid-2 { grid-template-columns: 1fr; } }
+.ds-col { display: flex; flex-direction: column; gap: 22px; }
+
+.ds-panel { background: var(--ds-surface); border: 1.5px solid var(--ds-border); border-radius: 18px; padding: 24px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.ds-panel-label { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ds-text-dimmer); margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+.ds-panel-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+
+/* avatar ring + camera badge */
+.ds-page .avatar-picker { position: relative; text-align: center; }
+.ds-page .avatar-picker-preview {
+  width: 96px; height: 96px; border-radius: 50%;
+  border: 2.5px solid var(--turquoise);
+  background: rgba(23,184,166,.08);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 10px;
+  overflow: hidden;
+}
+.ds-avatar-cam {
+  position: absolute; top: 68px; left: 50%; transform: translateX(30px);
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--ds-mint); color: #04140D;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  border: 3px solid var(--ds-obsidian);
+  pointer-events: none;
+}
+.ds-page .avatar-picker-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--ds-text-dim); text-align: center; margin-bottom: 14px; }
+.ds-page label { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ds-text-dimmer); display: block; margin-bottom: 8px; }
+.ds-page input[type="text"], .ds-page input[type="password"], .ds-page input[type="number"] {
+  width: 100%; background: rgba(255,255,255,.04); border: 1.5px solid var(--ds-border); color: var(--ds-text);
+  border-radius: 10px; padding: 11px 14px; font-size: 14px; font-weight: 600;
+}
+.ds-page input[type="text"]:focus, .ds-page input[type="password"]:focus, .ds-page input[type="number"]:focus { outline: none; border-color: var(--turquoise); }
+.ds-page .btn-small { font-size: 12px; padding: 10px 16px; border-radius: 10px; font-weight: 800; letter-spacing: .5px; }
+.ds-page .btn-small:not(.btn-outline) { background: var(--ds-mint); color: #04140D; }
+.ds-page .btn-small:not(.btn-outline):hover { background: #58e6ac; }
+.ds-page .btn-outline { background: transparent; border: 1.5px solid var(--ds-border); color: var(--ds-text-dim); }
+.ds-page .btn-outline:hover { border-color: var(--ds-text-dim); color: var(--ds-text); }
+.ds-page .btn-outline.crimson { border-color: rgba(215,38,61,.5); color: #ff6b81; }
+.ds-page #account-badge { display: block; text-align: center; margin-top: 14px; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--ds-text-dimmer); background: none; border: none; padding: 0; }
+
+.ds-stat-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--ds-border); font-size: 13px; font-weight: 700; color: var(--ds-text-dim); }
+.ds-stat-row:last-child { border-bottom: none; }
+.ds-stat-row span:last-child { color: var(--ds-text); font-weight: 800; }
+
+.ds-balance-row { display: flex; align-items: center; gap: 16px; }
+.ds-balance-amount { font-size: 26px; font-weight: 900; color: var(--ds-text); }
+.ds-balance-label { font-size: 12px; color: var(--ds-text-dim); line-height: 1.5; margin-top: 4px; }
+.ds-page .kkoin-add-btn { background: var(--orange); color: #241100; box-shadow: none; }
+.ds-page .kkoin-add-btn:hover { background: #ffb066; }
+
+.ds-page .items-empty { text-align: center; color: var(--ds-text-dimmer); font-size: 13px; padding: 18px 0; }
+.ds-page .item-card { background: var(--ds-surface-strong); border: 1px solid var(--ds-border); }
+
+.ds-page .tabs button { background: var(--ds-surface-strong); color: var(--ds-text-dim); border: 1.5px solid var(--ds-border); font-size: 12px; font-weight: 800; letter-spacing: .5px; }
+.ds-page .tabs button.active { background: var(--ds-mint); color: #04140D; border-color: var(--ds-mint); }
+.ds-page .locked-banner { background: rgba(215,38,61,.12); border: 1.5px solid rgba(215,38,61,.4); color: #ff8b98; }
+.ds-page .admin-grant-panel-note { color: var(--ds-text-dim); }

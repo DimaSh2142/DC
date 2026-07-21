@@ -8,109 +8,123 @@
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <div class="center-screen">
-    <div class="card" style="max-width:520px; width:100%;">
-      <a href="/" class="back-link" id="cabinet-back-link">← На головну</a>
-      <h1 style="margin-top:0;">Особистий кабінет</h1>
+  <div class="ds-page">
+    <div class="hub-bg-spheres" aria-hidden="true">
+      <span class="hub-sphere s1"></span>
+      <span class="hub-sphere s2"></span>
+      <span class="hub-sphere s3"></span>
+    </div>
+
+    <div class="ds-shell">
+      <div class="ds-topbar">
+        <a href="/" class="back-link ds-back-link" id="cabinet-back-link">← На головну</a>
+        <span class="ds-brand-mark"><b>DSLAND</b> · CABINET</span>
+      </div>
+
+      <div class="ds-eyebrow">/ 03 — Кабінет</div>
+      <h1 class="ds-heading">Особистий <span class="ds-heading-gradient mint">кабінет</span></h1>
+      <p class="ds-lede" style="max-width:560px; margin-bottom:36px;">Твій профіль, статистика, баланс та налаштування — все в одному місці.</p>
 
       <div id="gate-section">
-        <p style="color:var(--turquoise-dark);">Введіть свій нікнейм (той самий, під яким граєте у вікторині), щоб відкрити кабінет. Пароль потрібен лише якщо хочеш власний акаунт (щоб ніхто інший не міг зайти під твоїм нікнеймом) — можна лишити порожнім і просто грати.</p>
-        <form id="gate-form" class="stack">
-          <div class="field" style="margin-bottom:10px;">
+        <div class="ds-panel" style="max-width:420px;">
+          <p class="ds-lede" style="max-width:none; margin-bottom:20px;">Введіть свій нікнейм (той самий, під яким граєте у вікторині), щоб відкрити кабінет. Пароль потрібен лише якщо хочеш власний акаунт — можна лишити порожнім і просто грати.</p>
+          <form id="gate-form">
             <label for="gate-nickname">Нікнейм</label>
-            <input type="text" id="gate-nickname" maxlength="24" placeholder="Наприклад, Dima" autocomplete="off">
-          </div>
-          <div class="field" style="margin-bottom:10px;">
+            <input type="text" id="gate-nickname" maxlength="24" placeholder="Наприклад, Dima" autocomplete="off" style="margin-bottom:16px;">
             <label for="gate-password">Пароль (необов'язково)</label>
             <input type="password" id="gate-password" maxlength="72" placeholder="Залиш порожнім, щоб зайти без акаунту">
-          </div>
-          <button type="submit" id="gate-submit-btn">Зберегти</button>
-        </form>
+            <button type="submit" id="gate-submit-btn" class="btn-small" style="width:100%; margin-top:20px;">Зберегти</button>
+          </form>
+        </div>
       </div>
 
       <div id="profile-section" style="display:none;">
-        <div id="locked-banner" class="locked-banner" style="display:none;">
+        <div id="locked-banner" class="locked-banner" style="display:none; margin-bottom:20px;">
           🔒 Зміна аватарки та нікнейму недоступна під час активної гри.
         </div>
 
-        <div class="row" style="align-items:center; gap:16px; margin-bottom:8px; flex-wrap:nowrap;">
-          <div>
-            <div class="avatar-picker" id="avatar-picker">
-              <div class="avatar-picker-preview" id="avatar-preview-wrap"></div>
+        <div class="ds-grid-2">
+          <div class="ds-col">
+            <div class="ds-panel" style="text-align:center;">
+              <div class="avatar-picker" id="avatar-picker">
+                <div class="avatar-picker-preview" id="avatar-preview-wrap"></div>
+                <span class="ds-avatar-cam" aria-hidden="true">📷</span>
+                <input type="file" id="avatar-file-input" accept="image/*" style="display:none;">
+              </div>
               <div class="avatar-picker-label" id="avatar-picker-label">Змінити фото</div>
-              <input type="file" id="avatar-file-input" accept="image/*" style="display:none;">
+              <button type="button" id="avatar-preset-btn" class="btn-small btn-outline" style="width:100%; margin-bottom:18px;">Готові аватарки</button>
+
+              <label for="nickname-input">Нікнейм</label>
+              <input type="text" id="nickname-input" maxlength="24" autocomplete="off" style="margin-bottom:14px;">
+              <div style="display:flex; gap:8px;">
+                <button type="button" id="save-nickname-btn" class="btn-small" style="flex:1;">Зберегти</button>
+                <button type="button" id="switch-profile-btn" class="btn-small btn-outline" style="flex:1;">Інший</button>
+              </div>
+              <button type="button" id="logout-btn" class="btn-small btn-outline crimson" style="display:none; width:100%; margin-top:8px;">Вийти з акаунту</button>
+              <span id="account-badge"></span>
             </div>
-            <button type="button" id="avatar-preset-btn" class="btn-small btn-outline" style="margin-top:6px; width:100%;">Готові аватарки</button>
-          </div>
-          <div style="flex:1; min-width:0;">
-            <label for="nickname-input">Нікнейм</label>
-            <input type="text" id="nickname-input" maxlength="24" autocomplete="off">
-          </div>
-        </div>
-        <div class="row" style="margin-bottom:22px;">
-          <button type="button" id="save-nickname-btn" class="btn-small">Зберегти нікнейм</button>
-          <button type="button" id="switch-profile-btn" class="btn-small btn-outline">Інший нікнейм</button>
-          <button type="button" id="logout-btn" class="btn-small btn-outline crimson" style="display:none;">Вийти з акаунту</button>
-        </div>
 
-        <div class="row" style="margin-bottom:20px; flex-wrap:wrap; gap:8px;">
-          <span class="badge outline">✅ Правильних: <span id="stat-correct">0</span></span>
-          <span class="badge outline">❌ Неправильних: <span id="stat-incorrect">0</span></span>
-          <span class="badge outline">🎮 Ігор зіграно: <span id="stat-games">0</span></span>
-          <span class="badge outline" id="account-badge"></span>
-        </div>
+            <div class="ds-panel">
+              <div class="ds-panel-label">Статистика</div>
+              <div class="ds-stat-row"><span>✅ Правильних</span><span id="stat-correct">0</span></div>
+              <div class="ds-stat-row"><span>❌ Неправильних</span><span id="stat-incorrect">0</span></div>
+              <div class="ds-stat-row"><span>🎮 Ігор зіграно</span><span id="stat-games">0</span></div>
+            </div>
 
-        <div class="kkoin-panel">
-          <div class="kkoin-emoji">🪙</div>
-          <div style="min-width:0; flex:1;">
-            <div class="kkoin-amount"><span id="kkoin-amount">0</span> ККоїн</div>
-            <div class="kkoin-label">Вигравай вікторину командою — ККоїни діляться між усіма гравцями команди-переможця. Витрачай їх у Казино та на ставки в міні-іграх.</div>
+            <div class="ds-panel" id="admin-grant-panel" style="display:none;">
+              <div class="ds-panel-label">🛡️ Видати ККоїни (адмін)</div>
+              <label for="grant-nickname">Нікнейм гравця</label>
+              <input type="text" id="grant-nickname" style="margin-bottom:12px;">
+              <label for="grant-amount">Кількість</label>
+              <input type="number" id="grant-amount" style="margin-bottom:16px;">
+              <button type="button" id="grant-kkoin-btn" class="btn-small" style="width:100%;">Видати</button>
+            </div>
           </div>
-          <button type="button" id="kkoin-add-btn" class="kkoin-add-btn" title="Як отримати більше ККоїнів" aria-label="Як отримати більше ККоїнів">+</button>
-        </div>
 
-        <div class="items-panel">
-          <div class="row between" style="align-items:center; margin-bottom:10px;">
-            <h2 style="margin:0;">🎒 Речі на вивід</h2>
-          </div>
-          <div id="items-empty" class="items-empty">Поки що порожньо. Тут будуть з'являтися речі, які випадуть із кейсів у Казино.</div>
-          <div id="items-list" class="items-list"></div>
-        </div>
+          <div class="ds-col">
+            <div class="ds-panel">
+              <div class="row between" style="align-items:flex-start;">
+                <div>
+                  <div class="ds-panel-label" style="margin-bottom:10px;"><span class="ds-panel-icon" style="background:rgba(242,153,74,.16); color:var(--orange);">🪙</span>Баланс</div>
+                  <div class="ds-balance-amount"><span id="kkoin-amount">0</span> ККойн</div>
+                </div>
+                <button type="button" id="kkoin-add-btn" class="kkoin-add-btn" title="Як отримати більше ККоїнів" aria-label="Як отримати більше ККоїнів">+</button>
+              </div>
+              <p class="ds-balance-label">Вигравай вікторину командою — ККоїни діляться між усіма гравцями команди-переможця. Витрачай їх у Казино та на ставки в міні-іграх.</p>
+            </div>
 
-        <div class="items-panel" id="admin-grant-panel" style="display:none;">
-          <div class="row between" style="align-items:center; margin-bottom:10px;">
-            <h2 style="margin:0;">🛡️ Видати ККоїни (адмін)</h2>
-          </div>
-          <div class="row" style="gap:8px; flex-wrap:wrap;">
-            <input type="text" id="grant-nickname" placeholder="Нікнейм гравця" style="flex:1; min-width:140px;">
-            <input type="number" id="grant-amount" placeholder="Кількість" style="width:110px;">
-            <button type="button" id="grant-kkoin-btn" class="btn-small">Видати</button>
-          </div>
-        </div>
+            <div class="ds-panel">
+              <div class="ds-panel-label"><span class="ds-panel-icon" style="background:rgba(215,38,61,.16); color:#ff6b81;">🎒</span>Речі на вивід</div>
+              <div id="items-empty" class="items-empty">Поки що порожньо. Тут будуть з'являтися речі, які випадуть із кейсів у Казино.</div>
+              <div id="items-list" class="items-list"></div>
+            </div>
 
-        <h2 style="margin-bottom:10px;">Налаштування</h2>
-        <div class="field">
-          <label>Тема сайту</label>
-          <div class="tabs" id="theme-tabs">
-            <button type="button" data-theme="light">☀️ Світла</button>
-            <button type="button" data-theme="dark">🌙 Темна</button>
+            <div class="ds-panel">
+              <div class="ds-panel-label">Налаштування</div>
+              <label>Тема сайту</label>
+              <div class="tabs" id="theme-tabs" style="margin-bottom:20px;">
+                <button type="button" data-theme="light">☀️ Світла</button>
+                <button type="button" data-theme="dark">🌙 Темна</button>
+              </div>
+              <label for="music-volume">Гучність музики (<span id="music-volume-value">80</span>%)</label>
+              <input type="range" id="music-volume" min="0" max="100" step="1" style="margin-bottom:20px;">
+              <label for="mic-volume">Гучність мікрофону інших учасників (<span id="mic-volume-value">100</span>%)</label>
+              <input type="range" id="mic-volume" min="0" max="100" step="1">
+            </div>
           </div>
-        </div>
-        <div class="field">
-          <label for="music-volume">Гучність музики (<span id="music-volume-value">80</span>%)</label>
-          <input type="range" id="music-volume" min="0" max="100" step="1">
-        </div>
-        <div class="field" style="margin-bottom:0;">
-          <label for="mic-volume">Гучність мікрофону інших учасників (<span id="mic-volume-value">100</span>%)</label>
-          <input type="range" id="mic-volume" min="0" max="100" step="1">
         </div>
       </div>
 
-      <p class="footer-note">Made by DimaSh</p>
+      <div class="ds-footer">
+        <span>DSLand | Cabinet</span>
+        <span>Made by DimaSh</span>
+        <span class="ds-footer-status"><span class="hub-status-dot"></span>Online · <span class="ds-utc-clock">--:--</span> UTC</span>
+      </div>
     </div>
   </div>
 
   <script src="/js/common.js"></script>
   <script src="/js/profile.js"></script>
+  <script src="/js/hub.js"></script>
 </body>
 </html>
