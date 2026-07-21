@@ -134,6 +134,7 @@
     clear(app);
     if (!joined || !roomState) return renderJoin();
     if (roomState.status === 'lobby') return renderLobby();
+    if (roomState.status === 'ready_check') return renderReadyCheck();
     if (roomState.status === 'in_progress') return renderGame();
     if (roomState.status === 'finished') return renderFinished();
   }
@@ -204,8 +205,8 @@
 
     app.appendChild(el('div', { class: 'center-screen', style: 'min-height:80vh;' }, [
       el('div', { class: 'card', style: 'max-width:420px; width:100%;' }, [
-        el('img', { src: '/img/logo.jpg', alt: 'DSGame', class: 'brand-logo', style: 'display:block; width:110px; height:auto; margin:0 auto 10px;' }),
-        el('h1', { class: 'brand-title', style: 'text-align:center; font-size:26px;' }, ['DS', el('span', { class: 'accent' }, ['Game'])]),
+        el('img', { src: '/img/logo.jpg', alt: 'DSLand', class: 'brand-logo', style: 'display:block; width:110px; height:auto; margin:0 auto 10px;' }),
+        el('h1', { class: 'brand-title', style: 'text-align:center; font-size:26px;' }, ['DS', el('span', { class: 'accent' }, ['Land'])]),
         form
       ])
     ]));
@@ -284,6 +285,50 @@
       }
     }
     wrap.appendChild(factButton());
+    app.appendChild(wrap);
+  }
+
+  // dima's spec: the quiz should only actually START (turn order picked,
+  // board interactive) once EVERY teamed player has pressed "Я готовий(ва)"
+  // -- AFTER teams have already seen the themes. roomState.readyCheck comes
+  // straight from roomManager.getReadyStatus() via publicState(), so this
+  // reads as a plain function of the current room:state broadcast, same as
+  // every other render*() here -- no separate local ready-tracking needed.
+  function renderReadyCheck() {
+    const wrap = el('div', {}, []);
+    const rc = roomState.readyCheck || { readyCount: 0, totalCount: 0, pendingNicknames: [] };
+    const iAmReady = myTeamId() && !rc.pendingNicknames.some(n => n.toLowerCase() === me.nickname.toLowerCase());
+    const round = roomState.rounds[roomState.currentRoundIndex];
+
+    wrap.appendChild(el('div', { class: 'row between' }, [
+      el('h2', {}, ['Готовність до старту']),
+      el('span', { class: 'badge outline' }, ['Кімната ' + roomState.code])
+    ]));
+    wrap.appendChild(renderTeamsBar());
+
+    const readyBoxChildren = [
+      el('p', { style: 'margin:0 0 12px;' }, ['Ознайомтесь із темами нижче. Гра почнеться, щойно всі учасники підтвердять готовність.']),
+      el('div', { style: 'font-size:26px; font-weight:800; color:var(--turquoise-dark); margin-bottom:14px;' }, [rc.readyCount + ' / ' + rc.totalCount + ' готові'])
+    ];
+    if (!myTeamId()) {
+      readyBoxChildren.push(el('p', { style: 'color:var(--crimson-dark); font-weight:600;' }, ['Ви ще без команди -- дочекайтесь наступної гри.']));
+    } else if (iAmReady) {
+      readyBoxChildren.push(el('p', { style: 'font-weight:700; color:var(--turquoise-dark);' }, ['✅ Ви готові! Очікуємо інших учасників…']));
+    } else {
+      readyBoxChildren.push(el('button', { onclick: () => {
+        socket.emit('player:set_ready', {}, (res) => { if (res && res.error) toast(res.error, true); });
+      }}, ['Я готовий(ва)']));
+    }
+    if (rc.pendingNicknames.length) {
+      readyBoxChildren.push(el('p', { style: 'font-size:12px; color:var(--turquoise-dark); margin-top:12px;' }, ['Очікуємо: ' + rc.pendingNicknames.join(', ')]));
+    }
+    wrap.appendChild(el('div', { class: 'card', style: 'text-align:center; margin:14px 0;' }, readyBoxChildren));
+
+    // renderBoard() naturally comes out fully "locked" here -- isMyTurn()
+    // requires roomState.activeTeamId, which is only set once the game
+    // actually starts (see roomManager._actuallyStartGame) -- so this is a
+    // safe, read-only preview of the themes with zero extra guard code.
+    wrap.appendChild(renderBoard(round));
     app.appendChild(wrap);
   }
 
@@ -497,7 +542,7 @@
       finishedConfettiFiredFor = roomState.code;
       confettiBurst(140);
     }
-    app.appendChild(el('div', {}, [
+    const wrap = el('div', {}, [
       el('h2', {}, ['Гру завершено!']),
       el('div', { class: 'stack' }, sorted.map((t, i) =>
         el('div', { class: 'card', style: 'display:flex; justify-content:space-between; align-items:center;' }, [
@@ -505,7 +550,28 @@
           el('div', { style: 'font-size:22px; font-weight:800;' }, [String(t.score)])
         ])
       ))
-    ]));
+    ]);
+    // MVP + KKoin (dima's spec) -- both come straight from roomState (set by
+    // roomManager._computeMvpAndKkoin at game-end, carried through
+    // publicState() like every other field here), so this just reads
+    // whatever the server already decided -- no client-side computation.
+    if (roomState.mvp && roomState.mvp.nicknames && roomState.mvp.nicknames.length) {
+      wrap.appendChild(el('div', { class: 'card', style: 'margin-top:14px; text-align:center; border-color:var(--orange);' }, [
+        el('div', { style: 'font-size:15px; font-weight:700; color:var(--orange-dark);' }, ['\u{1F31F} MVP вікторини']),
+        el('div', { style: 'font-size:19px; font-weight:800; margin-top:4px;' }, [roomState.mvp.nicknames.join(', ')]),
+        el('div', { style: 'font-size:12px; color:var(--turquoise-dark); margin-top:2px;' }, ['Найбільше правильних відповідей: ' + roomState.mvp.correctCount])
+      ]));
+    }
+    if (roomState.kkoinAward && roomState.kkoinAward.perPlayer > 0) {
+      wrap.appendChild(el('div', { class: 'kkoin-panel', style: 'margin-top:14px;' }, [
+        el('div', { class: 'kkoin-emoji' }, ['\u{1FA99}']),
+        el('div', { style: 'min-width:0;' }, [
+          el('div', { class: 'kkoin-amount' }, ['+' + roomState.kkoinAward.perPlayer + ' ККоїн']),
+          el('div', { class: 'kkoin-label' }, ['Команда-переможець (' + roomState.kkoinAward.teamNames.join(', ') + ') отримує ККоїни -- нарахування вже на балансі кожного учасника в особистому кабінеті.'])
+        ])
+      ]));
+    }
+    app.appendChild(wrap);
   }
 
   // ---------------- timer ----------------
@@ -540,6 +606,10 @@
     if (!audioEl) {
       audioEl = document.createElement('audio');
       audioEl.autoplay = true;
+      // "гучність мікрофону інших учасників" (profile page setting) -- this
+      // is playback volume on OUR end for what we hear from THEM, applied
+      // per remote peer since each gets its own <audio> element.
+      audioEl.volume = getMicVolume() / 100;
       remoteAudioEls[remoteId] = audioEl;
       document.body.appendChild(audioEl);
     }
@@ -710,10 +780,12 @@
         teamYtPlayer = new YT.Player('ytTeamMusicPlayer', {
           height: '1', width: '1', videoId: musicState.videoId,
           playerVars: { autoplay: musicState.isPlaying ? 1 : 0, controls: 0, start: Math.floor(targetSec) },
-          events: { onReady: (e) => { if (musicState.isPlaying) e.target.playVideo(); else e.target.pauseVideo(); } }
+          // volume from the profile page's "гучність музики" setting, same as admin.js's host music panel
+          events: { onReady: (e) => { e.target.setVolume(getMusicVolume()); if (musicState.isPlaying) e.target.playVideo(); else e.target.pauseVideo(); } }
         });
         return;
       }
+      teamYtPlayer.setVolume(getMusicVolume());
       if (musicState.videoId !== teamYtLoadedVideoId) {
         teamYtLoadedVideoId = musicState.videoId;
         teamYtPlayer.loadVideoById(musicState.videoId, targetSec);
@@ -874,6 +946,7 @@
   });
 
   socket.on('answer:corrected', () => { toast('Адмін скоригував останню відповідь'); });
+  socket.on('ready_check:started', () => { toast('Ознайомтесь із темами та натисніть «Я готовий(ва)», коли будете готові!'); });
   socket.on('game:started', () => { toast('Гру розпочато! Хід визначено.'); });
   socket.on('teams:rebalanced', () => { toast('Команди перебалансовано адміном'); });
 

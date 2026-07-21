@@ -1,7 +1,7 @@
 @echo off
-title DSGame - public tunnel (cloudflared)
+title DSLand - public tunnel (cloudflared)
 echo ============================================
-echo   DSGame -- public internet tunnel (cloudflared)
+echo   DSLand -- public internet tunnel (cloudflared)
 echo ============================================
 echo.
 echo IMPORTANT: start-dsgame.bat must already be running in another window

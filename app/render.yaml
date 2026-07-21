@@ -1,4 +1,4 @@
-# Render.com "Blueprint" deploy config for DSGame -- OPTIONAL, for a
+# Render.com "Blueprint" deploy config for DSLand -- OPTIONAL, for a
 # permanent public URL (unlike the temporary localtunnel/cloudflared tunnel
 # documented in README.md / PROGRESS.md). Not applied automatically: Claude
 # never creates third-party accounts on dima's behalf. To use this, dima
@@ -10,7 +10,7 @@
 
 services:
   - type: web
-    name: dsgame
+    name: dsland
     runtime: node
     plan: free
     rootDir: app

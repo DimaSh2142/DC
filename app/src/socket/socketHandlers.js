@@ -202,6 +202,10 @@ function registerSocketHandlers(io, { roomManager, adminAuth }) {
       if (cb) cb({ ok: true, teams: result.teams });
     }));
 
+    // dima's ready-check ask: this no longer starts the game directly -- it
+    // opens the ready_check phase (board already visible, each player must
+    // press "Я готовий(а)"). The real game:started only fires once everyone
+    // is ready -- see player:set_ready / admin:force_start_game below.
     socket.on('admin:start_game', safe(async (payload, cb) => {
       if (!requireAdmin(socket, cb)) return;
       const room = roomManager.getRoom(payload.roomCode);
@@ -210,8 +214,48 @@ function registerSocketHandlers(io, { roomManager, adminAuth }) {
       if (result.error) return cb && cb({ error: result.error });
       broadcastPublicState(room);
       broadcastAdminState(room);
+      io.to(room.code).emit('ready_check:started', { roomCode: room.code });
+      if (cb) cb({ ok: true });
+    }));
+
+    socket.on('admin:force_start_game', safe(async (payload, cb) => {
+      if (!requireAdmin(socket, cb)) return;
+      const room = roomManager.getRoom(payload.roomCode);
+      if (!room) return cb && cb({ error: 'Кімнату не знайдено' });
+      const result = roomManager.forceStartFromReadyCheck(room);
+      if (result.error) return cb && cb({ error: result.error });
+      broadcastPublicState(room);
+      broadcastAdminState(room);
       io.to(room.code).emit('game:started', { activeTeamId: roomManager.getActiveTeamId(room) });
       if (cb) cb({ ok: true });
+    }));
+
+    socket.on('admin:cancel_ready_check', safe(async (payload, cb) => {
+      if (!requireAdmin(socket, cb)) return;
+      const room = roomManager.getRoom(payload.roomCode);
+      if (!room) return cb && cb({ error: 'Кімнату не знайдено' });
+      const result = roomManager.cancelReadyCheck(room);
+      if (result.error) return cb && cb({ error: result.error });
+      broadcastPublicState(room);
+      broadcastAdminState(room);
+      if (cb) cb({ ok: true });
+    }));
+
+    // Player-side "Я готовий(а)" button. teamId isn't needed as input --
+    // setPlayerReady just checks the caller's own roster entry has one, same
+    // server-is-truth pattern as every other player action in this file.
+    socket.on('player:set_ready', safe(async (payload, cb) => {
+      const room = roomManager.getRoom(socket.data.roomCode);
+      if (!room) return cb && cb({ error: 'Ви не в кімнаті' });
+      const key = playersStore.keyOf(socket.data.nickname);
+      const result = roomManager.setPlayerReady(room, key);
+      if (result.error) return cb && cb({ error: result.error });
+      broadcastPublicState(room);
+      broadcastAdminState(room);
+      if (result.started) {
+        io.to(room.code).emit('game:started', { activeTeamId: roomManager.getActiveTeamId(room) });
+      }
+      if (cb) cb({ ok: true, status: result.status, started: result.started });
     }));
 
     socket.on('admin:override_answer', safe(async (payload, cb) => {
@@ -276,7 +320,8 @@ function registerSocketHandlers(io, { roomManager, adminAuth }) {
       if (!requireAdmin(socket, cb)) return;
       const room = roomManager.getRoom(payload.roomCode);
       if (!room) return cb && cb({ error: 'Кімнату не знайдено' });
-      room.status = 'finished';
+      const result = roomManager.endGame(room);
+      if (result.error) return cb && cb({ error: result.error });
       broadcastPublicState(room);
       broadcastAdminState(room);
       if (cb) cb({ ok: true });

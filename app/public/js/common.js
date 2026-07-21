@@ -1,5 +1,39 @@
 // Shared tiny helpers used by both player.js and admin.js.
 
+// ---- site-wide personal settings ("Особистий кабінет" -> Налаштування, added
+// 2026-07-21) -- pure client-side presentation prefs, deliberately NOT sent
+// to the server (unlike nickname/avatar/kkoin in playersStore, these aren't
+// "who you are", just "how loud/which theme on THIS device"). Read by every
+// page via common.js (loaded before player.js/admin.js/profile.js on all of
+// them) so a setting changed once in the profile page applies everywhere.
+const SETTINGS_KEYS = {
+  theme: 'sigame_theme',              // 'light' | 'dark'
+  musicVolume: 'sigame_music_volume', // 0-100, applied to admin/team YouTube players
+  micVolume: 'sigame_mic_volume'      // 0-100, applied to OTHER participants' voice-chat audio playback
+};
+
+function getTheme() { return localStorage.getItem(SETTINGS_KEYS.theme) === 'dark' ? 'dark' : 'light'; }
+function setTheme(theme) {
+  localStorage.setItem(SETTINGS_KEYS.theme, theme === 'dark' ? 'dark' : 'light');
+  applyTheme();
+}
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', getTheme());
+}
+// Runs the instant this script is parsed (common.js is loaded before the
+// page's own content/scripts on every page) -- avoids a flash of the light
+// theme before a later DOMContentLoaded handler would otherwise fix it.
+applyTheme();
+
+function clampPercent(v, fallback) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fallback;
+}
+function getMusicVolume() { return clampPercent(localStorage.getItem(SETTINGS_KEYS.musicVolume), 80); }
+function setMusicVolume(v) { localStorage.setItem(SETTINGS_KEYS.musicVolume, String(clampPercent(v, 80))); }
+function getMicVolume() { return clampPercent(localStorage.getItem(SETTINGS_KEYS.micVolume), 100); }
+function setMicVolume(v) { localStorage.setItem(SETTINGS_KEYS.micVolume, String(clampPercent(v, 100))); }
+
 function toast(message, isError) {
   const el = document.createElement('div');
   el.className = 'toast' + (isError ? ' error' : '');

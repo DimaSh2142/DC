@@ -76,6 +76,12 @@ function makeFakeIo() {
         for (const roomName of Array.from(socket.rooms)) socket.leave(roomName);
       }
     };
+    // Real socket.io auto-joins every socket to a room named after its own
+    // `id` -- that's what makes `io.to(someSocketId).emit(...)` work as a
+    // "send to this one specific socket" idiom (used by miniGameHandlers.js
+    // for Battleship's per-player redacted views). Mirror that here so code
+    // under test doesn't need a separate "fake per-socket delivery" path.
+    socket.join(socket.id);
     for (const cb of connectionHandlers) cb(socket);
     return socket;
   }

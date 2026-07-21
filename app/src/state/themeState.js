@@ -93,4 +93,33 @@ function resetUsedThemes() {
   saveUsed([]);
 }
 
-module.exports = { pickFreshThemes, getBankStats, resetUsedThemes, loadBank };
+/**
+ * Permanently removes the given theme ids from the bank itself (2026-07
+ * dima request: once a quiz actually CONCLUDES -- naturally finishing or
+ * the admin ending it early -- the themes it used should disappear for
+ * good, not just be soft-preferred-against like pickFreshThemes() already
+ * did before this). Different from the existing usedThemes.json tracking:
+ * that one is a rotation hint (with an LRU reuse fallback) recorded at
+ * BOARD-GENERATION time; this is a real, permanent deletion from
+ * themesBank.json recorded at GAME-END time -- see roomManager.js's
+ * _deleteUsedThemesFromBank(). Also prunes the same ids out of
+ * usedThemes.json since there's no bank entry left for them to reference.
+ * Updates the in-memory bankCache too, so a still-running server process
+ * can never re-serve a just-deleted theme before its next restart.
+ */
+function deleteThemesFromBank(themeIds) {
+  if (!themeIds || themeIds.length === 0) return { deletedCount: 0 };
+  const idSet = new Set(themeIds);
+  const bank = loadBank();
+  const before = bank.length;
+  const remaining = bank.filter(t => !idSet.has(t.id));
+  bankCache = remaining;
+  writeJsonAtomic(BANK_FILE, remaining);
+
+  const used = loadUsed();
+  saveUsed(used.filter(u => !idSet.has(u.id)));
+
+  return { deletedCount: before - remaining.length };
+}
+
+module.exports = { pickFreshThemes, getBankStats, resetUsedThemes, loadBank, deleteThemesFromBank };

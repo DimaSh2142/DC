@@ -1,8 +1,8 @@
 @echo off
-title DSGame - push to GitHub
+title DSLand - push to GitHub
 cd /d "%~dp0"
 echo ============================================
-echo   DSGame -- push to github.com/DimaSh2142/DC
+echo   DSLand -- push to github.com/DimaSh2142/DC
 echo ============================================
 echo.
 
@@ -26,14 +26,13 @@ echo Staging files (node_modules, .env, and reference/ are excluded via .gitigno
 git add .
 
 echo Committing...
-git commit -m "Initial commit: DSGame team quiz app"
+git commit -m "Initial commit: DSLand team quiz app"
 if errorlevel 1 (
   echo.
   echo Nothing to commit, or commit failed -- see messages above.
   echo If this is your second run and there's nothing new, that's fine, continuing to push.
 )
 
-git branch -M main
 git remote remove origin >nul 2>&1
 git remote add origin https://github.com/DimaSh2142/DC.git
 
@@ -41,7 +40,7 @@ echo.
 echo Pushing to GitHub... a browser sign-in window may pop up the first time --
 echo just log in to your GitHub account there and this will continue automatically.
 echo.
-git push -u origin main
+git push -u origin HEAD
 
 echo.
 echo Done. If you saw an error above instead of a success message, copy it and

@@ -1,4 +1,4 @@
-/* DSGame -- strict 4-color palette: white / turquoise / crimson / orange.
+/* DSLand -- strict 4-color palette: white / turquoise / crimson / orange.
    Body text and shadows use dark/light SHADES of these same hues (not a 5th color)
    purely for readability -- see README for this design-constraint note. */
 :root {
@@ -15,6 +15,31 @@
   --orange-light: #FDECDC;
   --shadow: rgba(11, 61, 56, 0.18); /* elevation only, tinted with the ink shade */
   --radius: 14px;
+
+  /* Semantic aliases (2026-07-21, "Особистий кабінет" theme setting) -- pages
+     use these three instead of reaching for --white/--turquoise-ink directly,
+     so the [data-theme="dark"] override below can flip the whole site by
+     redefining just these three. Identical values to the raw tokens above in
+     light mode (the default, and the ONLY mode until a user opts into dark
+     in their profile settings), so nothing changes for anyone who never
+     touches that setting. */
+  --bg: var(--white);
+  --surface: var(--white);
+  --text: var(--turquoise-ink);
+}
+
+/* Dark mode -- still the same 4 hues, just dark shades standing in for the
+   "white" surface (same shade-not-a-5th-color principle as --turquoise-dark
+   etc. above). Toggled by common.js's applyTheme() setting
+   document.documentElement.dataset.theme from the profile page's setting. */
+[data-theme="dark"] {
+  --bg: #0B1917;
+  --surface: #123330;
+  --text: #E6F7F5;
+  --turquoise-light: #1B4A44;
+  --crimson-light: #3A171D;
+  --orange-light: #3A2818;
+  --shadow: rgba(0, 0, 0, 0.45);
 }
 
 * { box-sizing: border-box; }
@@ -22,8 +47,8 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--white);
-  color: var(--turquoise-ink);
+  background: var(--bg);
+  color: var(--text);
   font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   min-height: 100%;
   /* Custom cursor for all users (site-wide). SVG arrow re-skinned in the
@@ -73,7 +98,7 @@ h1, h2, h3 { margin: 0 0 .4em 0; line-height: 1.2; }
 }
 
 .card {
-  background: var(--white);
+  background: var(--surface);
   border: 2px solid var(--turquoise-light);
   border-radius: var(--radius);
   box-shadow: 0 6px 24px var(--shadow);
@@ -92,8 +117,8 @@ input[type="text"], input[type="password"], input[type="number"], select {
   border: 2px solid var(--turquoise-light);
   border-radius: 10px;
   outline: none;
-  color: var(--turquoise-ink);
-  background: var(--white);
+  color: var(--text);
+  background: var(--surface);
   width: 100%;
 }
 input:focus, select:focus { border-color: var(--turquoise); }
@@ -118,7 +143,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 
 button.btn-crimson { background: var(--crimson); }
 button.btn-outline {
-  background: var(--white);
+  background: var(--surface);
   color: var(--turquoise-dark);
   border: 2px solid var(--turquoise);
 }
@@ -143,7 +168,7 @@ button.btn-small { padding: 7px 12px; font-size: 13px; }
 .badge.crimson { background: var(--crimson); }
 .badge.orange { background: var(--orange); }
 .badge.outline {
-  background: var(--white);
+  background: var(--surface);
   color: var(--turquoise-dark);
   border: 1.5px solid var(--turquoise);
 }
@@ -312,7 +337,7 @@ button.btn-small { padding: 7px 12px; font-size: 13px; }
   margin-top: 14px;
 }
 .logo-option {
-  background: var(--white);
+  background: var(--surface);
   border: 3px solid var(--turquoise-light);
   border-radius: 10px;
   padding: 6px;
@@ -354,7 +379,7 @@ th { color: var(--turquoise-dark); }
 .footer-note { text-align: center; font-size: 12px; color: var(--turquoise-dark); opacity: .75; margin-top: 30px; }
 
 .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-.tabs button { background: var(--white); color: var(--turquoise-dark); border: 2px solid var(--turquoise-light); }
+.tabs button { background: var(--surface); color: var(--turquoise-dark); border: 2px solid var(--turquoise-light); }
 .tabs button.active { background: var(--turquoise); color: var(--white); border-color: var(--turquoise); }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -429,7 +454,7 @@ th { color: var(--turquoise-dark); }
 }
 @keyframes modal-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .modal-card {
-  background: var(--white);
+  background: var(--surface);
   border-radius: var(--radius);
   border: 2px solid var(--turquoise);
   box-shadow: 0 16px 48px rgba(11, 61, 56, 0.35);
@@ -484,3 +509,383 @@ th { color: var(--turquoise-dark); }
   margin-top: 14px;
 }
 .fact-button:hover:not(:disabled) { background: var(--orange-dark); }
+
+/* ---- hub homepage (2026-07-21 "глобальний проект" redesign) --------------
+   Replaces the old login-card landing page: big logo where the card used to
+   sit, a top nav row of 3 big buttons (Казино / Міні-ігри / Вікторина), and
+   a small corner icon for the personal cabinet -- matches dima's hand-drawn
+   mockup layout (3 boxes across the top, a 4th smaller one in the corner). */
+.hub-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 22px 20px 30px;
+  position: relative;
+  text-align: center;
+  user-select: none;
+}
+.hub-profile-icon {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 2px solid var(--turquoise);
+  box-shadow: 0 4px 14px var(--shadow);
+  transition: transform .15s ease;
+}
+.hub-profile-icon:hover { transform: scale(1.08); }
+.hub-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 720px;
+  margin: 54px 0 10px;
+}
+.hub-nav-btn {
+  flex: 1 1 180px;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2.5px solid var(--turquoise);
+  color: var(--turquoise-dark);
+  font-weight: 800;
+  font-size: 17px;
+  box-shadow: 0 6px 20px var(--shadow);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.hub-nav-btn:hover { transform: translateY(-4px); box-shadow: 0 10px 26px var(--shadow); }
+.hub-nav-emoji { font-size: 34px; line-height: 1; }
+.hub-nav-casino { border-color: var(--crimson); color: var(--crimson-dark); }
+.hub-nav-mini { border-color: var(--orange); color: var(--orange-dark); }
+.hub-nav-quiz { border-color: var(--turquoise); color: var(--turquoise-dark); }
+.hub-hero {
+  margin-top: 46px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.hub-logo { width: 240px; max-width: 60vw; height: auto; margin-bottom: 12px; }
+.hub-title { font-size: 40px; }
+.hub-tagline { color: var(--turquoise-dark); margin: 6px 0 0; font-size: 15px; }
+
+/* ---- small "back to hub" link used on every sub-page (quiz/casino/mini-games/profile) ---- */
+.back-link {
+  display: inline-block;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--turquoise-dark);
+}
+
+/* ---- "Особистий кабінет" (profile.html) ---- */
+.locked-banner {
+  background: var(--crimson-light);
+  border: 2px solid var(--crimson);
+  color: var(--crimson-dark);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+/* Coin-themed panel for the KKoin balance -- orange stands in for "gold" here
+   (no 5th hue added, same shade-of-an-existing-hue rule as everywhere else),
+   echoing the Krampus Coin reference dima linked without importing its colors. */
+.kkoin-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--orange-light);
+  border: 2px solid var(--orange);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 22px;
+}
+.kkoin-emoji { font-size: 36px; line-height: 1; flex-shrink: 0; }
+.kkoin-amount { font-size: 22px; font-weight: 800; color: var(--orange-dark); }
+.kkoin-label { font-size: 12px; color: var(--turquoise-dark); margin-top: 2px; }
+/* "+" button next to the KKoin balance -- opens "Як отримати більше
+   Крампус коїнів" (see profile.js openEarnMenu()). Deliberately round/bold
+   so it reads as "add more" at a glance, matching dima's "+сик великий" ask. */
+.kkoin-add-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 800;
+  background: var(--orange);
+  color: var(--white);
+  border: none;
+}
+.earn-menu-btn {
+  text-align: left;
+  white-space: normal;
+  line-height: 1.35;
+}
+.earn-menu-btn .earn-menu-btn-title { display: block; font-weight: 800; }
+.earn-menu-btn .earn-menu-btn-sub { display: block; font-weight: 400; font-size: 12px; opacity: .85; margin-top: 2px; }
+
+/* "Речі на вивід" (2026-07-21 scaffolding for future Казино lootbox winnings
+   -- the case-opening mechanic itself doesn't exist yet, so this is almost
+   always just the empty state for now). */
+.items-panel {
+  background: var(--white);
+  border: 2px solid var(--turquoise-light);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 22px;
+}
+.items-empty { font-size: 13px; color: var(--turquoise-dark); }
+.items-list { display: flex; flex-wrap: wrap; gap: 10px; }
+.item-card {
+  width: 84px;
+  text-align: center;
+  background: var(--orange-light);
+  border: 2px solid var(--orange);
+  border-radius: 10px;
+  padding: 8px 6px;
+  font-size: 11px;
+}
+.item-card-emoji { font-size: 28px; line-height: 1.3; }
+
+/* ---- "Бульбашки" (bubbles.html) -- single-player Bubble-Spinner-style
+   arcade game, canvas-rendered (see bubbles.js). Bubble colors themselves are
+   drawn straight from the site's 4-hue palette (+ its dark shades for higher
+   levels) rather than introducing new hues -- keeps the strict-palette rule
+   intact even inside a game board. */
+.bubbles-hud { margin-bottom: 10px; }
+.bubbles-stage {
+  position: relative;
+  margin: 0 auto;
+  width: 320px;
+  max-width: 100%;
+}
+#bubbles-canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 320 / 440;
+  display: block;
+  background: var(--turquoise-light);
+  border: 2px solid var(--turquoise);
+  border-radius: var(--radius);
+  cursor: url('/img/cursor-default.svg') 3 2, auto;
+  touch-action: none;
+}
+.bubbles-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 61, 56, 0.72);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bubbles-overlay-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 22px 26px;
+  text-align: center;
+  max-width: 260px;
+}
+.bubbles-overlay-title { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+.bubbles-overlay-sub { font-size: 13px; color: var(--turquoise-dark); margin-bottom: 16px; }
+.bubbles-help { font-size: 12px; color: var(--turquoise-dark); margin: 12px 0 6px; }
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--turquoise);
+  cursor: pointer;
+}
+
+/* ---- "Казино" (casino.html) -- look/animations modeled on the Krampus Coin
+   reference dima linked (falling snow + a slow-spinning coin over a dark
+   "night" hero), recreated in plain CSS. #0B1917 below is the SAME dark
+   shade already used as the dark-theme --bg (see :root [data-theme="dark"]
+   at the top of this file) -- reused intentionally, not a new hue, so the
+   strict 4-color rule still holds even on this deliberately darker page. ---- */
+.casino-card { padding: 0; overflow: hidden; }
+.casino-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 20px 24px 26px;
+  text-align: center;
+  color: var(--white);
+  background: linear-gradient(160deg, #0B1917 0%, var(--turquoise-ink) 55%, var(--crimson-dark) 130%);
+}
+.casino-hero-content { position: relative; z-index: 1; }
+.casino-back-link.back-link { color: var(--turquoise-light); margin-bottom: 6px; }
+.casino-snow-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.casino-snowflake {
+  position: absolute;
+  top: -10%;
+  color: var(--white);
+  animation-name: casino-snow-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes casino-snow-fall {
+  from { transform: translateY(-10%) translateX(0); }
+  to { transform: translateY(480%) translateX(12px); }
+}
+.casino-coin-wrap { margin: 6px 0 12px; }
+.casino-coin {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 5px solid var(--orange);
+  background: linear-gradient(180deg, var(--crimson) 0%, #0B1917 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38px;
+  box-shadow: 0 0 26px rgba(242, 153, 74, 0.45);
+  animation: casino-coin-spin 9s linear infinite;
+}
+@keyframes casino-coin-spin {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+.casino-title { font-size: 28px; margin: 4px 0 6px; }
+.casino-accent-gold { color: var(--orange); }
+.casino-tagline { color: var(--turquoise-light); font-size: 14px; margin: 0 0 16px; }
+.casino-kkoin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid var(--orange);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-weight: 800;
+  font-size: 17px;
+}
+.casino-kkoin-emoji { font-size: 20px; }
+.casino-kkoin-label { font-weight: 600; font-size: 12px; color: var(--turquoise-light); }
+.casino-body { padding: 22px 24px 0; text-align: center; }
+
+/* ---- "Міні-ігри" hub (minigames.html) ---- */
+.mg-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 18px 0;
+}
+@media (max-width: 560px) { .mg-hub-grid { grid-template-columns: 1fr; } }
+.mg-hub-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 18px 10px;
+  border-radius: var(--radius);
+  border: 2px solid var(--turquoise);
+  color: var(--turquoise-dark);
+  background: var(--surface);
+  transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s ease;
+}
+.mg-hub-card:hover { transform: translateY(-4px); box-shadow: 0 10px 26px var(--shadow); }
+.mg-hub-emoji { font-size: 34px; }
+.mg-hub-name { font-weight: 800; font-size: 15px; }
+.mg-hub-desc { font-size: 11px; opacity: .8; }
+.mg-hub-future { text-align: center; font-size: 12px; color: var(--turquoise-dark); opacity: .8; }
+
+/* ---- shared mini-game board grids (battleship/checkers/chess pages) ---- */
+.mg-boards-row { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+.mg-board-label { text-align: center; font-weight: 700; margin-bottom: 6px; font-size: 13px; color: var(--turquoise-dark); }
+
+.bship-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 28px));
+  grid-template-rows: repeat(10, minmax(0, 28px));
+  gap: 2px;
+}
+.bship-cell {
+  width: 100%; height: 100%;
+  border: none; border-radius: 4px;
+  background: var(--turquoise-light);
+  cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .1s ease, background-color .15s ease;
+}
+.bship-cell:hover:not(:disabled) { transform: scale(1.08); }
+.bship-cell:disabled { cursor: default; }
+.bship-cell.ship { background: var(--turquoise-dark); }
+.bship-cell.miss { background: var(--turquoise-light); color: var(--turquoise-dark); }
+.bship-cell.hit { background: var(--crimson); color: var(--white); }
+.bship-cell.sunk { background: var(--crimson-dark); color: var(--white); }
+.bship-cell.preview { background: var(--orange-light); border: 2px solid var(--orange); }
+.bship-cell.preview-invalid { background: var(--crimson-light); border: 2px solid var(--crimson); }
+
+.checkers-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 44px));
+  grid-template-rows: repeat(8, minmax(0, 44px));
+  gap: 0;
+  border: 3px solid var(--turquoise-dark);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.checkers-cell {
+  width: 100%; height: 100%;
+  border: none; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: default;
+}
+.checkers-cell.light { background: var(--turquoise-light); }
+.checkers-cell.dark { background: var(--turquoise-dark); cursor: pointer; }
+.checkers-cell.selectable { box-shadow: inset 0 0 0 3px var(--orange); }
+.checkers-cell.selected { box-shadow: inset 0 0 0 3px var(--crimson); }
+.checkers-piece {
+  width: 76%; height: 76%;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(0,0,0,.35);
+}
+.checkers-piece.p0 { background: var(--white); color: var(--turquoise-ink); border: 2px solid var(--turquoise-dark); }
+.checkers-piece.p1 { background: var(--crimson); color: var(--white); border: 2px solid var(--crimson-dark); }
+
+.chess-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 48px));
+  grid-template-rows: repeat(8, minmax(0, 48px));
+  gap: 0;
+  border: 3px solid var(--turquoise-dark);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.chess-cell {
+  width: 100%; height: 100%;
+  border: none; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px;
+  cursor: pointer;
+  line-height: 1;
+}
+.chess-cell.light { background: var(--turquoise-light); }
+.chess-cell.dark { background: var(--turquoise-dark); }
+.chess-cell.selectable { box-shadow: inset 0 0 0 3px var(--orange); }
+.chess-cell.selected { box-shadow: inset 0 0 0 3px var(--crimson); }
+.chess-cell.last-move { box-shadow: inset 0 0 0 3px var(--turquoise); }

@@ -8,10 +8,18 @@ app/.env
 app/data/players.json
 app/data/usedThemes.json
 
+# user-submitted SiGame packs ("Закинь українізовану SiGame" button) — may
+# contain copyrighted third-party media, same reasoning as reference/ below;
+# dima reviews these locally, they're never meant for the public repo
+app/data/submittedPacks/
+
 # OS junk
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# stray log from local smoke-testing
+app/server_smoke.log
 
 # large private reference pack — not meant for public distribution
 reference/

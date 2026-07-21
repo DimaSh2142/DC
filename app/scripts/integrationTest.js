@@ -1,8 +1,44 @@
+const fs = require('fs');
+const path = require('path');
+
+// Hermetic re-runs: playersStore genuinely persists to data/players.json on
+// disk (by design -- accuracy stats/kkoin/avatar need to survive a server
+// restart), which means running this file twice in a row used to make
+// nickname-uniqueness assertions below (renameNickname's "already taken"
+// check) fail on the SECOND run against leftover profiles from the first.
+// Reset it before requiring playersStore so its lazy-loaded cache starts
+// from a clean file every single run, same as the manual reset this repo's
+// workflow already does after a real play session -- just automatic now.
+const PLAYERS_FILE = path.join(__dirname, '..', 'data', 'players.json');
+fs.writeFileSync(PLAYERS_FILE, '{}\n');
+
+// CRITICAL data-safety guard (added 2026-07 alongside dima's "delete themes
+// from the bank once a quiz finishes" feature): several scenarios below
+// play a real quiz through to genuine completion, which now PERMANENTLY
+// deletes the themes it used from data/themesBank.json -- dima's real,
+// hand-curated 597-theme content bank, not disposable test fixtures. Without
+// this guard, every test run would silently and irreversibly eat into that
+// real content. Snapshot both files byte-for-byte up front and restore them
+// on the 'exit' event (fires on normal completion, on the explicit
+// process.exit(1) below, AND after an uncaught exception -- Node still
+// raises 'exit' once the process is actually terminating), so the real bank
+// is bit-for-bit exactly as it was before this run no matter how it ends.
+const BANK_FILE = path.join(__dirname, '..', 'data', 'themesBank.json');
+const USED_THEMES_FILE = path.join(__dirname, '..', 'data', 'usedThemes.json');
+const bankSnapshot = fs.readFileSync(BANK_FILE, 'utf8');
+const usedThemesSnapshot = fs.readFileSync(USED_THEMES_FILE, 'utf8');
+process.on('exit', () => {
+  fs.writeFileSync(BANK_FILE, bankSnapshot);
+  fs.writeFileSync(USED_THEMES_FILE, usedThemesSnapshot);
+});
+
 const { makeFakeIo } = require('./fakeSocketHarness');
 const { registerSocketHandlers } = require('../src/socket/socketHandlers');
 const { RoomManager } = require('../src/state/roomManager');
 const adminAuth = require('../src/state/adminAuth');
 const config = require('../src/config');
+const playersStore = require('../src/state/playersStore');
+const themeState = require('../src/state/themeState');
 
 async function main() {
   const { io, newConnection } = makeFakeIo();
@@ -13,6 +49,17 @@ async function main() {
   function assert(cond, msg) {
     assertions.push({ cond: !!cond, msg });
     console.log((cond ? 'PASS' : 'FAIL') + ' - ' + msg);
+  }
+
+  // 2026-07-21: admin:start_game now only opens the ready_check phase (see
+  // roomManager.startGame doc comment) -- every test scenario that needs the
+  // game ACTUALLY in_progress has to also ready up each teamed player via
+  // player:set_ready. `sockets` is a plain array of every player socket in
+  // the room (order doesn't matter, unteamed ones are just no-ops server-side).
+  async function readyUpAll(sockets) {
+    for (const s of sockets) {
+      await s.trigger('player:set_ready', {});
+    }
   }
 
   // ---- admin flow ----
@@ -59,7 +106,9 @@ async function main() {
   assert(startRes.ok, 'game started');
 
   const room = roomManager.getRoom(roomCode);
-  assert(room.status === 'in_progress', 'room status is in_progress');
+  assert(room.status === 'ready_check', 'room status is ready_check right after admin:start_game (not in_progress yet)');
+  await readyUpAll(Object.values(playerSocks));
+  assert(room.status === 'in_progress', 'room status is in_progress once every teamed player has pressed ready');
 
   // ---- play through every question via the socket layer ----
   let rounds = 0;
@@ -103,6 +152,7 @@ async function main() {
   await adminSock.trigger('admin:assign_teams', { roomCode: roomCode2, numTeams: 2 });
   await adminSock.trigger('admin:generate_board', { roomCode: roomCode2, numRounds: 1, themesPerRound: 1 });
   await adminSock.trigger('admin:start_game', { roomCode: roomCode2 });
+  await readyUpAll([s1, s2]);
   const room2 = roomManager.getRoom(roomCode2);
   const activeTeam2 = roomManager.getActiveTeamId(room2);
   const inactiveSock = room2.players.get('solo1').teamId === activeTeam2 ? s2 : s1;
@@ -135,6 +185,7 @@ async function main() {
 
   await adminSock.trigger('admin:generate_board', { roomCode: roomCode3, numRounds: 1, themesPerRound: 1 });
   await adminSock.trigger('admin:start_game', { roomCode: roomCode3 });
+  await readyUpAll([a1, a2]);
   const activeTeam3 = roomManager.getActiveTeamId(room3);
   const activeSock3 = room3.players.get('zoe').teamId === activeTeam3 ? a1 : a2;
   const round3 = roomManager.getCurrentRound(room3);
@@ -176,6 +227,7 @@ async function main() {
   await adminSock.trigger('admin:assign_teams', { roomCode: roomCode4, numTeams: 3 });
   await adminSock.trigger('admin:generate_board', { roomCode: roomCode4, numRounds: 1, themesPerRound: 1 });
   await adminSock.trigger('admin:start_game', { roomCode: roomCode4 });
+  await readyUpAll([q1, q2, q3]);
   const room4 = roomManager.getRoom(roomCode4);
   const activeTeamBefore = roomManager.getActiveTeamId(room4);
   const activeTeamMembers = room4.teams.find(t => t.id === activeTeamBefore).memberKeys.slice();
@@ -379,7 +431,7 @@ async function main() {
   await adminSock.trigger('admin:generate_board', { roomCode: roomCode8, numRounds: 1, themesPerRound: 1 });
   await adminSock.trigger('admin:start_game', { roomCode: roomCode8 });
   const moveMidGame = await adminSock.trigger('admin:move_player_to_team', { roomCode: roomCode8, nicknameKey: 'stayer', teamId: originalTeamId });
-  assert(moveMidGame.error, 'admin:move_player_to_team is rejected once the game is in_progress (' + moveMidGame.error + ')');
+  assert(moveMidGame.error, 'admin:move_player_to_team is rejected once past lobby (ready_check counts too) (' + moveMidGame.error + ')');
 
   // ---- publicState() vs adminState() answer-leak boundary (added 2026-07-20 run, item 8) ----
   const created9 = await adminSock.trigger('admin:create_room', {});
@@ -422,6 +474,7 @@ async function main() {
   await adminSock.trigger('admin:assign_teams', { roomCode: roomCode10, numTeams: 2 });
   await adminSock.trigger('admin:generate_board', { roomCode: roomCode10, numRounds: 1, themesPerRound: 2 });
   await adminSock.trigger('admin:start_game', { roomCode: roomCode10 });
+  await readyUpAll([hn1, hn2]);
 
   const room10 = roomManager.getRoom(roomCode10);
   const activeTeam10 = roomManager.getActiveTeamId(room10);
@@ -492,6 +545,211 @@ async function main() {
 
   const pub11 = roomManager.publicState(room11);
   assert(pub11.teamMusic && Object.prototype.hasOwnProperty.call(pub11.teamMusic, milaTeam), 'publicState() exposes teamMusic so a reconnecting player can catch up mid-song');
+
+  // ---- ready-check phase (added 2026-07-21 "глобальний проект" run) ----
+  const created12 = await adminSock.trigger('admin:create_room', {});
+  const roomCode12 = created12.room.code;
+  const rc1 = newConnection('rc1'); await rc1.trigger('player:join', { nickname: 'Ready1', roomCode: roomCode12 });
+  const rc2 = newConnection('rc2'); await rc2.trigger('player:join', { nickname: 'Ready2', roomCode: roomCode12 });
+  await adminSock.trigger('admin:assign_teams', { roomCode: roomCode12, numTeams: 2 });
+  await adminSock.trigger('admin:generate_board', { roomCode: roomCode12, numRounds: 1, themesPerRound: 1 });
+  const room12 = roomManager.getRoom(roomCode12);
+
+  const rc3 = newConnection('rc3'); // joins AFTER teams formed -- deliberately left without a teamId
+  await rc3.trigger('player:join', { nickname: 'Latecomer', roomCode: roomCode12 });
+  const lateReady = await rc3.trigger('player:set_ready', {});
+  assert(lateReady.error, 'player:set_ready rejected before any ready_check has even begun');
+
+  const startRc = await adminSock.trigger('admin:start_game', { roomCode: roomCode12 });
+  assert(startRc.ok, 'admin:start_game opens the ready_check phase');
+  assert(room12.status === 'ready_check', 'room actually sitting in ready_check, board already generated/visible');
+
+  const noTeamReady = await rc3.trigger('player:set_ready', {});
+  assert(noTeamReady.error, 'a player with no team cannot press ready (nothing to hold up)');
+
+  const firstReady = await rc1.trigger('player:set_ready', {});
+  assert(firstReady.ok && !firstReady.started, 'first player readying up does NOT start the game yet (2nd player still pending)');
+  assert(room12.status === 'ready_check', 'still in ready_check with one player left');
+  assert(room12.readyPlayers.size === 1, 'exactly one nicknameKey recorded as ready so far');
+
+  const secondReady = await rc2.trigger('player:set_ready', {});
+  assert(secondReady.ok && secondReady.started === true, 'the LAST player readying up flips started=true in the response');
+  assert(room12.status === 'in_progress', 'room actually transitioned to in_progress once everyone was ready');
+  assert(room12.turnOrder.length === 2, 'turn order was actually built as part of the real start');
+
+  // ---- admin force-start (someone AFK during ready_check) ----
+  const created13 = await adminSock.trigger('admin:create_room', {});
+  const roomCode13 = created13.room.code;
+  const fs1 = newConnection('fs1'); await fs1.trigger('player:join', { nickname: 'Afk1', roomCode: roomCode13 });
+  const fs2 = newConnection('fs2'); await fs2.trigger('player:join', { nickname: 'Afk2', roomCode: roomCode13 });
+  await adminSock.trigger('admin:assign_teams', { roomCode: roomCode13, numTeams: 2 });
+  await adminSock.trigger('admin:generate_board', { roomCode: roomCode13, numRounds: 1, themesPerRound: 1 });
+  await adminSock.trigger('admin:start_game', { roomCode: roomCode13 });
+  const room13 = roomManager.getRoom(roomCode13);
+  const rogueForceStart = await fs1.trigger('admin:force_start_game', { roomCode: roomCode13 });
+  assert(rogueForceStart.error, 'non-admin socket cannot call admin:force_start_game directly (security boundary)');
+  const forceStartRes = await adminSock.trigger('admin:force_start_game', { roomCode: roomCode13 });
+  assert(forceStartRes.ok, 'admin:force_start_game succeeds with nobody having pressed ready at all');
+  assert(room13.status === 'in_progress', 'force-start actually moved the room to in_progress');
+
+  // ---- admin cancels a ready check (wrong teams, wants to redo) ----
+  const created14 = await adminSock.trigger('admin:create_room', {});
+  const roomCode14 = created14.room.code;
+  const cc1 = newConnection('cc1'); await cc1.trigger('player:join', { nickname: 'Cancel1', roomCode: roomCode14 });
+  const cc2 = newConnection('cc2'); await cc2.trigger('player:join', { nickname: 'Cancel2', roomCode: roomCode14 });
+  await adminSock.trigger('admin:assign_teams', { roomCode: roomCode14, numTeams: 2 });
+  await adminSock.trigger('admin:generate_board', { roomCode: roomCode14, numRounds: 1, themesPerRound: 1 });
+  const startRes14 = await adminSock.trigger('admin:start_game', { roomCode: roomCode14 });
+  assert(startRes14.ok, 'sanity: room14 actually reached ready_check before attempting to cancel it');
+  const room14 = roomManager.getRoom(roomCode14);
+  const cancelRes = await adminSock.trigger('admin:cancel_ready_check', { roomCode: roomCode14 });
+  assert(cancelRes.ok && room14.status === 'lobby', 'admin:cancel_ready_check reverts a ready_check back to lobby (not finished)');
+  const boardStillThere = await adminSock.trigger('admin:generate_board', { roomCode: roomCode14, numRounds: 1, themesPerRound: 1 });
+  assert(boardStillThere.ok, 'sanity: room is genuinely back in lobby -- can regenerate the board again');
+
+  // ---- MVP + KKoin award at game end (dima's currency ask) ----
+  const created15 = await adminSock.trigger('admin:create_room', {});
+  const roomCode15 = created15.room.code;
+  const rex = newConnection('rex'); await rex.trigger('player:join', { nickname: 'Rex', roomCode: roomCode15 });
+  const sam = newConnection('sam'); await sam.trigger('player:join', { nickname: 'Sam', roomCode: roomCode15 });
+  const tia = newConnection('tia'); await tia.trigger('player:join', { nickname: 'Tia', roomCode: roomCode15 });
+  const uma = newConnection('uma'); await uma.trigger('player:join', { nickname: 'Uma', roomCode: roomCode15 });
+  await adminSock.trigger('admin:assign_teams', { roomCode: roomCode15, numTeams: 2 });
+  await adminSock.trigger('admin:generate_board', { roomCode: roomCode15, numRounds: 1, themesPerRound: 2 });
+  const room15 = roomManager.getRoom(roomCode15);
+  const teamRexId = room15.players.get('rex').teamId;
+  // force a deterministic 2v2 split regardless of how the snake draft landed, so "Rex's team" below is unambiguous
+  const teamSamOtherId = room15.teams.find(t => t.id !== teamRexId).id;
+  await adminSock.trigger('admin:move_player_to_team', { roomCode: roomCode15, nicknameKey: 'sam', teamId: teamRexId });
+  await adminSock.trigger('admin:move_player_to_team', { roomCode: roomCode15, nicknameKey: 'tia', teamId: teamSamOtherId });
+  await adminSock.trigger('admin:move_player_to_team', { roomCode: roomCode15, nicknameKey: 'uma', teamId: teamSamOtherId });
+  await adminSock.trigger('admin:start_game', { roomCode: roomCode15 });
+  await readyUpAll([rex, sam, tia, uma]);
+  assert(room15.status === 'in_progress', 'sanity: MVP/KKoin test room actually reached in_progress');
+
+  const rexKkoinBefore = playersStore.getProfile('Rex').kkoin;
+  const samKkoinBefore = playersStore.getProfile('Sam').kkoin;
+  const tiaKkoinBefore = playersStore.getProfile('Tia').kkoin;
+
+  let safety15 = 0;
+  while (room15.status === 'in_progress' && safety15 < 20) {
+    safety15++;
+    const activeTeamId15 = roomManager.getActiveTeamId(room15);
+    const round15 = roomManager.getCurrentRound(room15);
+    let target15 = null;
+    for (const theme of round15.themes) {
+      for (const q of theme.questions) { if (!q.used) { target15 = { themeId: theme.id, price: q.price, question: q }; break; } }
+      if (target15) break;
+    }
+    if (!target15) break;
+    if (activeTeamId15 === teamRexId) {
+      // Rex's team -- ALWAYS Rex himself answers, and always correctly, so
+      // he's unambiguously both the MVP and on the winning team.
+      await rex.trigger('player:pick_question', { themeId: target15.themeId, price: target15.price });
+      await rex.trigger('player:submit_answer', { text: target15.question.accepted[0] });
+    } else {
+      // The other team always answers WRONG, so their score only ever drops.
+      await tia.trigger('player:pick_question', { themeId: target15.themeId, price: target15.price });
+      await tia.trigger('player:submit_answer', { text: 'zzz_definitely_not_the_answer_zzz' });
+    }
+  }
+
+  assert(room15.status === 'finished', 'sanity: MVP/KKoin test game actually ran to completion');
+  const teamRex15 = room15.teams.find(t => t.id === teamRexId);
+  const teamOther15 = room15.teams.find(t => t.id === teamSamOtherId);
+  assert(teamRex15.score > teamOther15.score, 'sanity: Rex\'s always-correct team actually ended with the higher score');
+
+  assert(room15.mvp && room15.mvp.nicknames.includes('Rex') && !room15.mvp.nicknames.includes('Sam'),
+    'MVP is Rex specifically (he answered every one of his team\'s questions) -- teammate Sam who never answered is NOT credited');
+  assert(room15.mvp.correctCount > 0, 'MVP correctCount actually reflects real correct answers, not a zero default');
+
+  assert(room15.kkoinAward && room15.kkoinAward.teamNames.includes(teamRex15.name), 'kkoinAward names the actual winning team');
+  const expectedPerPlayer = Math.floor(config.KKOIN_WIN_POOL / 2); // teamRex has exactly 2 members (Rex + Sam)
+  assert(room15.kkoinAward.perPlayer === expectedPerPlayer, 'KKoin pool split evenly across the winning team\'s 2 members (' + room15.kkoinAward.perPlayer + ' each)');
+
+  const rexKkoinAfter = playersStore.getProfile('Rex').kkoin;
+  const samKkoinAfter = playersStore.getProfile('Sam').kkoin;
+  const tiaKkoinAfter = playersStore.getProfile('Tia').kkoin;
+  assert(rexKkoinAfter === rexKkoinBefore + expectedPerPlayer, 'Rex\'s persistent kkoin balance actually increased by his share');
+  assert(samKkoinAfter === samKkoinBefore + expectedPerPlayer, 'Sam ALSO got a full share -- "ділитись між учасниками команди" -- even though he never personally answered a question');
+  assert(tiaKkoinAfter === tiaKkoinBefore, 'the LOSING team gets zero KKoin');
+
+  // ---- personal cabinet: playersStore avatar/rename/kkoin + roomManager's "locked mid-game" guard ----
+  const renameOk = playersStore.renameNickname('Rex', 'RexRenamed');
+  assert(!renameOk.error && renameOk.profile.nickname === 'RexRenamed', 'playersStore.renameNickname migrates the profile to the new display name');
+  assert(playersStore.getProfile('rexrenamed').kkoin === rexKkoinAfter, 'renamed profile keeps its prior kkoin balance (migration, not a fresh record)');
+  const renameClash = playersStore.renameNickname('Sam', 'RexRenamed');
+  assert(renameClash.error, 'renameNickname rejects a name already taken by someone else');
+
+  const avatarSet = playersStore.setAvatar('Uma', 'data:image/png;base64,' + 'D'.repeat(200));
+  assert(!!avatarSet.avatar, 'playersStore.setAvatar persists an avatar on the profile');
+
+  // Uma is still connected+teamed in room15, but that room already finished --
+  // isNicknameInActiveGame must key off status (ready_check/in_progress),
+  // not mere presence in the players map, so a profile edit after the game
+  // ends should NOT be locked.
+  assert(roomManager.isNicknameInActiveGame('Uma') === false, 'isNicknameInActiveGame is false once the room has finished (not locked forever just for having played)');
+  assert(roomManager.isNicknameInActiveGame('Ready1') === true, 'isNicknameInActiveGame is true for a player still connected in an in_progress room (room12, left mid-game on purpose)');
+
+  // ---- dima 2026-07: themes used in a quiz disappear from the bank once it
+  // actually ends -- both the natural full-completion path AND the admin's
+  // early "Завершити гру" path. Real deletion from data/themesBank.json,
+  // not just the existing soft usedThemes.json rotation tracking -- see
+  // themeState.deleteThemesFromBank's header comment. The whole run's real
+  // bank file is snapshotted/restored around this file's 'exit' handler
+  // (see the top of this file) specifically because of scenarios like this.
+  const created16 = await adminSock.trigger('admin:create_room', {});
+  const roomCode16 = created16.room.code;
+  const d1 = newConnection('d1'); await d1.trigger('player:join', { nickname: 'Delta1', roomCode: roomCode16 });
+  const d2 = newConnection('d2'); await d2.trigger('player:join', { nickname: 'Delta2', roomCode: roomCode16 });
+  await adminSock.trigger('admin:assign_teams', { roomCode: roomCode16, numTeams: 2 });
+  await adminSock.trigger('admin:generate_board', { roomCode: roomCode16, numRounds: 1, themesPerRound: 1 });
+  const room16 = roomManager.getRoom(roomCode16);
+  const themeId16 = room16.rounds[0].themes[0].id;
+  const bankBefore16 = themeState.loadBank();
+  assert(bankBefore16.some(t => t.id === themeId16), 'sanity: the freshly generated theme is still present in the bank before the game finishes');
+
+  await adminSock.trigger('admin:start_game', { roomCode: roomCode16 });
+  await readyUpAll([d1, d2]);
+  let rounds16 = 0;
+  while (room16.status === 'in_progress' && rounds16 < 20) {
+    const activeTeamId16 = roomManager.getActiveTeamId(room16);
+    const activeSock16 = room16.players.get('delta1').teamId === activeTeamId16 ? d1 : d2;
+    const round16 = roomManager.getCurrentRound(room16);
+    let target16 = null;
+    for (const theme of round16.themes) {
+      for (const q of theme.questions) { if (!q.used) { target16 = { themeId: theme.id, price: q.price, question: q }; break; } }
+      if (target16) break;
+    }
+    if (!target16) break;
+    await activeSock16.trigger('player:pick_question', { themeId: target16.themeId, price: target16.price });
+    const opened16 = activeSock16.lastReceived('question:opened');
+    const payload16 = opened16.type === 'select' ? { optionId: opened16.clue.options[0].optionId } : { text: target16.question.accepted ? target16.question.accepted[0] : 'x' };
+    await activeSock16.trigger('player:submit_answer', payload16);
+    rounds16++;
+  }
+  assert(room16.status === 'finished', 'sanity: the natural-completion theme-deletion test game actually ran to completion');
+  const bankAfter16 = themeState.loadBank();
+  assert(!bankAfter16.some(t => t.id === themeId16), 'the theme used in a NATURALLY completed quiz is permanently deleted from the bank');
+  assert(bankAfter16.length === bankBefore16.length - 1, 'the bank shrank by exactly the 1 theme this game used (not more, not less)');
+
+  const created17 = await adminSock.trigger('admin:create_room', {});
+  const roomCode17 = created17.room.code;
+  const e1 = newConnection('e1'); await e1.trigger('player:join', { nickname: 'Echo1', roomCode: roomCode17 });
+  const e2 = newConnection('e2'); await e2.trigger('player:join', { nickname: 'Echo2', roomCode: roomCode17 });
+  await adminSock.trigger('admin:assign_teams', { roomCode: roomCode17, numTeams: 2 });
+  await adminSock.trigger('admin:generate_board', { roomCode: roomCode17, numRounds: 1, themesPerRound: 1 });
+  const room17 = roomManager.getRoom(roomCode17);
+  const themeId17 = room17.rounds[0].themes[0].id;
+  assert(themeState.loadBank().some(t => t.id === themeId17), 'sanity: this second theme is also present in the bank before its room is ended early');
+
+  const endRes17 = await adminSock.trigger('admin:end_game', { roomCode: roomCode17 });
+  assert(endRes17.ok, 'admin:end_game succeeds on a room that never even started playing');
+  assert(room17.status === 'finished', 'admin:end_game moves the room straight to finished');
+  assert(!themeState.loadBank().some(t => t.id === themeId17), 'the theme from an EARLY-ENDED quiz (admin "Завершити гру") is ALSO permanently deleted from the bank');
+
+  const endAgain17 = await adminSock.trigger('admin:end_game', { roomCode: roomCode17 });
+  assert(endAgain17.error, 'admin:end_game rejects being called twice on an already-finished room');
 
   console.log('');
   const failed = assertions.filter(a => !a.cond);

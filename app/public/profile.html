@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Особистий кабінет — DSLand</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="center-screen">
+    <div class="card" style="max-width:520px; width:100%;">
+      <a href="/" class="back-link">← На головну</a>
+      <h1 style="margin-top:0;">Особистий кабінет</h1>
+
+      <div id="gate-section">
+        <p style="color:var(--turquoise-dark);">Введіть свій нікнейм (той самий, під яким граєте у вікторині), щоб відкрити кабінет.</p>
+        <form id="gate-form" class="stack">
+          <div class="field" style="margin-bottom:10px;">
+            <label for="gate-nickname">Нікнейм</label>
+            <input type="text" id="gate-nickname" maxlength="24" placeholder="Наприклад, Dima" autocomplete="off">
+          </div>
+          <button type="submit">Відкрити кабінет</button>
+        </form>
+      </div>
+
+      <div id="profile-section" style="display:none;">
+        <div id="locked-banner" class="locked-banner" style="display:none;">
+          🔒 Зміна аватарки та нікнейму недоступна під час активної гри.
+        </div>
+
+        <div class="row" style="align-items:center; gap:16px; margin-bottom:8px; flex-wrap:nowrap;">
+          <div class="avatar-picker" id="avatar-picker">
+            <div class="avatar-picker-preview" id="avatar-preview-wrap"></div>
+            <div class="avatar-picker-label" id="avatar-picker-label">Змінити фото</div>
+            <input type="file" id="avatar-file-input" accept="image/*" style="display:none;">
+          </div>
+          <div style="flex:1; min-width:0;">
+            <label for="nickname-input">Нікнейм</label>
+            <input type="text" id="nickname-input" maxlength="24" autocomplete="off">
+          </div>
+        </div>
+        <div class="row" style="margin-bottom:22px;">
+          <button type="button" id="save-nickname-btn" class="btn-small">Зберегти нікнейм</button>
+          <button type="button" id="switch-profile-btn" class="btn-small btn-outline">Інший нікнейм</button>
+        </div>
+
+        <div class="row" style="margin-bottom:20px; flex-wrap:wrap; gap:8px;">
+          <span class="badge outline">✅ Правильних: <span id="stat-correct">0</span></span>
+          <span class="badge outline">❌ Неправильних: <span id="stat-incorrect">0</span></span>
+          <span class="badge outline">🎮 Ігор зіграно: <span id="stat-games">0</span></span>
+        </div>
+
+        <div class="kkoin-panel">
+          <div class="kkoin-emoji">🪙</div>
+          <div style="min-width:0; flex:1;">
+            <div class="kkoin-amount"><span id="kkoin-amount">0</span> ККоїн</div>
+            <div class="kkoin-label">Вигравай вікторину командою — ККоїни діляться між усіма гравцями команди-переможця. Витрачай їх у Казино та на ставки в міні-іграх.</div>
+          </div>
+          <button type="button" id="kkoin-add-btn" class="kkoin-add-btn" title="Як отримати більше ККоїнів" aria-label="Як отримати більше ККоїнів">+</button>
+        </div>
+
+        <div class="items-panel">
+          <div class="row between" style="align-items:center; margin-bottom:10px;">
+            <h2 style="margin:0;">🎒 Речі на вивід</h2>
+          </div>
+          <div id="items-empty" class="items-empty">Поки що порожньо. Тут будуть з'являтися речі, які випадуть із кейсів у Казино.</div>
+          <div id="items-list" class="items-list"></div>
+        </div>
+
+        <h2 style="margin-bottom:10px;">Налаштування</h2>
+        <div class="field">
+          <label>Тема сайту</label>
+          <div class="tabs" id="theme-tabs">
+            <button type="button" data-theme="light">☀️ Світла</button>
+            <button type="button" data-theme="dark">🌙 Темна</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="music-volume">Гучність музики (<span id="music-volume-value">80</span>%)</label>
+          <input type="range" id="music-volume" min="0" max="100" step="1">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="mic-volume">Гучність мікрофону інших учасників (<span id="mic-volume-value">100</span>%)</label>
+          <input type="range" id="mic-volume" min="0" max="100" step="1">
+        </div>
+      </div>
+
+      <p class="footer-note">Made by DimaSh</p>
+    </div>
+  </div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/profile.js"></script>
+</body>
+</html>

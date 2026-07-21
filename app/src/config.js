@@ -15,6 +15,34 @@ module.exports = {
   DEFAULT_NUM_TEAMS: 3,
   ADMIN_TOKEN_TTL_MS: 24 * 60 * 60 * 1000, // 24h
 
+  // KKoin economy (2026-07-21 "глобальний проект" expansion). Awarded to the
+  // WINNING team in the quiz, split evenly across that team's members --
+  // spendable later in Казино / мінi-ігри. Kept as a single tunable pool
+  // rather than per-question payouts so the quiz's existing scoring math
+  // (team.score, prices, hints) stays completely untouched -- KKoin is a
+  // separate currency layered on top, not a replacement for the score.
+  KKOIN_WIN_POOL: 100,
+
+  // "Як отримати більше Крампус коїнів" menu (2026-07-21, dima's "+" button
+  // next to the KKoin balance in Особистий кабінет) -- two more ways to earn
+  // besides winning a quiz, both instant/honor-system (no admin approval gate
+  // exists yet, matching the trust-based tone of the rest of this friend-group
+  // app): submitting a Ukrainianized SiGame pack for dima to review later, and
+  // clearing a level of the single-player "Бульбашки" (Bubble Spinner) game.
+  SIQ_SUBMIT_KKOIN_REWARD: 20,
+  BUBBLE_LEVEL_KKOIN_REWARD: 2,
+
+  // "Поповнити моментально" button -- purely informational (opens a modal
+  // pointing at dima's Telegram), never a real payment flow: this app must
+  // never execute financial transactions itself.
+  TOPUP_TELEGRAM_HANDLE: '@Traym',
+
+  // Ready-check gate (dima: "вікторина починалась... тільки після того як
+  // кожен учасник нажме кнопку Я готовий"). No timeout by default -- the
+  // room just waits; the admin can still force-start if someone vanishes
+  // (see roomManager.forceStartFromReadyCheck).
+  READY_CHECK_ENABLED: true,
+
   ROUND_NAME_PAIRS: [
     ['Раунд перший, для розігріву', 'Раунд другий, вже серйозно'],
     ['Раунд 1: легка прогулянка', 'Раунд 2: тепер без пощади'],

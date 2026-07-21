@@ -49,7 +49,7 @@ class Room {
     this.code = code;
     this.createdAt = Date.now();
     this.updatedAt = Date.now();
-    this.status = 'lobby'; // lobby | in_progress | finished
+    this.status = 'lobby'; // lobby | ready_check | in_progress | finished
     this.players = new Map(); // key(nicknameLower) -> {nickname, key, socketId, teamId, connected}
     this.teams = []; // [{id, name, color, score, memberKeys:[]}]
     this.rounds = []; // [{ name, themes: [{id,name,category,questions:[{price,type,clue,accepted?,correctOptionId?,display,used}]}] }]
@@ -59,6 +59,9 @@ class Room {
     this.activeQuestion = null; // { themeId, price, openedAt, locked, timer }
     this.lastResolvedAnswer = null; // for admin override grace window
     this.teamMusic = {}; // teamId -> { videoId, isPlaying, positionSec, updatedAt } | null -- see setTeamMusic()
+    this.readyPlayers = new Set(); // nicknameKeys who've pressed "Я готовий(а)" during ready_check (see startGame/setPlayerReady)
+    this.mvp = null; // { nicknames: [...], correctCount } -- computed once the game finishes, see _resolve()
+    this.kkoinAward = null; // { teamId, teamName, perPlayer, players: [{nickname, newBalance}] } -- see _resolve()
   }
 }
 
@@ -87,6 +90,26 @@ class RoomManager {
     const room = this.getRoom(code);
     if (room && room.activeQuestion && room.activeQuestion.timer) clearTimeout(room.activeQuestion.timer);
     this.rooms.delete(String(code || '').trim().toUpperCase());
+  }
+
+  /**
+   * "Особистий кабінет" guard (dima: "заміна недоступна під час будь якої
+   * гри"): true if this nickname is a CONNECTED member of any room that's
+   * actively mid-game (ready_check counts too -- teams have already seen the
+   * board by then, so changing identity mid-lineup would be just as
+   * disruptive as mid-question). A room sitting in plain 'lobby' doesn't
+   * lock anything -- nothing's actually started yet. Scans every room
+   * (there's no room-code context on the profile page) -- fine at this
+   * app's scale (a handful of concurrent rooms for a friend group).
+   */
+  isNicknameInActiveGame(nickname) {
+    const key = playersStore.keyOf(nickname);
+    for (const room of this.rooms.values()) {
+      if (room.status !== 'in_progress' && room.status !== 'ready_check') continue;
+      const player = room.players.get(key);
+      if (player && player.connected) return true;
+    }
+    return false;
   }
 
   /** Garbage-collect rooms with nobody connected for a long while. */
@@ -119,7 +142,16 @@ class RoomManager {
       if (normalizedAvatar) existing.avatar = normalizedAvatar;
       return { player: existing, reconnect: true, avatarRejected };
     }
-    const player = { nickname: String(nickname).trim(), key, socketId, teamId: null, connected: true, personalScore: 0, avatar: normalizedAvatar };
+    // If this join didn't send a fresh avatar, fall back to whatever's saved
+    // on the persistent "Особистий кабінет" profile (playersStore) -- that's
+    // the whole point of making the avatar persistent there now (see
+    // playersStore.js 2026-07-21 fields): set it once in your profile and it
+    // should just show up in every game from then on.
+    const profileAvatar = playersStore.getProfile(nickname).avatar || null;
+    const player = {
+      nickname: String(nickname).trim(), key, socketId, teamId: null, connected: true,
+      personalScore: 0, gameCorrect: 0, avatar: normalizedAvatar || profileAvatar
+    };
     room.players.set(key, player);
     return { player, reconnect: false, avatarRejected };
   }
@@ -129,6 +161,7 @@ class RoomManager {
       if (player.socketId === socketId) {
         player.connected = false;
         room.updatedAt = Date.now();
+        this._maybeAutoStartReadyCheck(room);
         return player;
       }
     }
@@ -140,12 +173,32 @@ class RoomManager {
     for (const team of room.teams) {
       team.memberKeys = team.memberKeys.filter(k => k !== nicknameKey);
     }
+    this._maybeAutoStartReadyCheck(room);
+  }
+
+  /**
+   * Same self-healing spirit as getActiveTeamId's empty-team skip: if the
+   * player who just disconnected/got kicked was the last one everyone else
+   * was waiting on, don't leave the room stuck in ready_check forever --
+   * the remaining connected+teamed players are already all ready, so just
+   * go. (This intentionally does NOT emit its own 'game:started' toast --
+   * the next room:state broadcast already reflects in_progress either way,
+   * and the caller's existing broadcastPublicState/broadcastAdminState
+   * covers the state sync; a dedicated toast for this rare edge case isn't
+   * worth the extra plumbing right now.)
+   */
+  _maybeAutoStartReadyCheck(room) {
+    if (room.status !== 'ready_check') return;
+    const status = this.getReadyStatus(room);
+    if (status.totalCount > 0 && status.readyCount >= status.totalCount) {
+      this._actuallyStartGame(room);
+    }
   }
 
   // ---- teams ----
 
   assignTeamsSnake(room, numTeams) {
-    if (room.status === 'in_progress') {
+    if (room.status === 'in_progress' || room.status === 'ready_check') {
       return { error: 'Гра вже триває -- спочатку завершіть її, щоб не обнулити рахунок і не зламати чергу ходів' };
     }
     const roster = Array.from(room.players.values());
@@ -309,7 +362,7 @@ class RoomManager {
   // ---- board / rounds ----
 
   generateBoard(room, { numRounds, themesPerRound } = {}) {
-    if (room.status === 'in_progress') {
+    if (room.status === 'in_progress' || room.status === 'ready_check') {
       return { error: 'Гра вже триває -- дошку не можна перегенерувати посеред гри' };
     }
     const rounds = numRounds || config.DEFAULT_NUM_ROUNDS;
@@ -337,9 +390,65 @@ class RoomManager {
 
   // ---- gameplay ----
 
+  /**
+   * dima's "ready check" ask: the quiz shouldn't actually begin (turn order,
+   * timers) the instant the admin clicks start -- teams should first SEE the
+   * board/themes, then each player presses "Я готовий(а)", and only once
+   * everyone (who's actually on a team) has done that does the real game
+   * begin. So this no longer starts the game directly -- it just opens the
+   * ready_check phase; see setPlayerReady() for where _actuallyStartGame()
+   * actually gets called once the last player readies up, and
+   * forceStartFromReadyCheck() for the admin's manual override.
+   */
   startGame(room) {
     if (room.teams.length < 2) return { error: 'Потрібно щонайменше 2 команди' };
     if (room.rounds.length === 0) return { error: 'Спочатку згенеруйте теми (адмін-кнопка)' };
+    if (room.status !== 'lobby') return { error: 'Гру вже розпочато' };
+    room.status = 'ready_check';
+    room.readyPlayers = new Set();
+    room.updatedAt = Date.now();
+    return { ok: true };
+  }
+
+  /** Who still needs to press ready -- players with a team assigned, connected, not yet in readyPlayers. */
+  getReadyStatus(room) {
+    const pending = Array.from(room.players.values()).filter(p => p.teamId && p.connected);
+    const readyCount = pending.filter(p => room.readyPlayers.has(p.key)).length;
+    return { readyCount, totalCount: pending.length, pendingNicknames: pending.filter(p => !room.readyPlayers.has(p.key)).map(p => p.nickname) };
+  }
+
+  setPlayerReady(room, nicknameKey) {
+    if (room.status !== 'ready_check') return { error: 'Зараз не очікування готовності' };
+    const player = room.players.get(nicknameKey);
+    if (!player || !player.teamId) return { error: 'Спочатку маєте бути в команді' };
+    room.readyPlayers.add(nicknameKey);
+    room.updatedAt = Date.now();
+    const status = this.getReadyStatus(room);
+    let started = false;
+    if (status.totalCount > 0 && status.readyCount >= status.totalCount) {
+      this._actuallyStartGame(room);
+      started = true;
+    }
+    return { ok: true, status, started };
+  }
+
+  /** Admin override for "someone's AFK and will never press ready" -- starts anyway with whoever's ready. */
+  forceStartFromReadyCheck(room) {
+    if (room.status !== 'ready_check') return { error: 'Зараз не очікування готовності' };
+    this._actuallyStartGame(room);
+    return { ok: true };
+  }
+
+  /** Admin backs out of a ready check entirely (e.g. wrong teams) -- back to lobby, not "finished" (nothing was actually played). */
+  cancelReadyCheck(room) {
+    if (room.status !== 'ready_check') return { error: 'Зараз не очікування готовності' };
+    room.status = 'lobby';
+    room.readyPlayers = new Set();
+    room.updatedAt = Date.now();
+    return { ok: true };
+  }
+
+  _actuallyStartGame(room) {
     room.turnOrder = room.teams.map(t => t.id);
     for (let i = room.turnOrder.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -348,6 +457,9 @@ class RoomManager {
     room.currentTurnPos = 0;
     room.status = 'in_progress';
     room.currentRoundIndex = 0;
+    room.mvp = null;
+    room.kkoinAward = null;
+    for (const p of room.players.values()) p.gameCorrect = 0; // fresh per-game MVP tally, see _resolve()
     room.updatedAt = Date.now();
     const nicknames = Array.from(room.players.values()).map(p => p.nickname);
     playersStore.markPlayed(nicknames);
@@ -488,6 +600,13 @@ class RoomManager {
 
     if (!timedOut && nickname) {
       playersStore.recordAnswer(nickname, wasCorrect);
+      // Per-GAME (not lifetime) correct-answer tally, reset in
+      // _actuallyStartGame() -- this is what MVP is computed from below,
+      // deliberately separate from playersStore's cross-game lifetime stats.
+      if (wasCorrect) {
+        const answeringPlayer = room.players.get(playersStore.keyOf(nickname));
+        if (answeringPlayer) answeringPlayer.gameCorrect = (answeringPlayer.gameCorrect || 0) + 1;
+      }
     }
 
     room.lastResolvedAnswer = {
@@ -516,6 +635,8 @@ class RoomManager {
       } else {
         gameComplete = true;
         room.status = 'finished';
+        this._computeMvpAndKkoin(room);
+        this._deleteUsedThemesFromBank(room);
       }
     }
     room.updatedAt = Date.now();
@@ -534,8 +655,82 @@ class RoomManager {
       nextActiveTeamId: this.getActiveTeamId(room),
       roundComplete,
       gameComplete,
-      currentRoundIndex: room.currentRoundIndex
+      currentRoundIndex: room.currentRoundIndex,
+      mvp: room.mvp,
+      kkoinAward: room.kkoinAward
     };
+  }
+
+  /**
+   * dima's two end-of-game asks: (1) MVP -- "того хто найбільше дав
+   * правильних відповідей" -- computed from gameCorrect (this game only,
+   * not lifetime); ties are named together rather than arbitrarily picking
+   * one. (2) KKoin -- config.KKOIN_WIN_POOL split evenly across the winning
+   * team's members ("ділитись між учасниками команди"); if multiple teams
+   * tie for first, they all share the SAME pool rather than each getting a
+   * full one (avoids a tie being worth double). Both are stored on the room
+   * (so a reconnecting client's publicState() still shows them on the
+   * finished screen) AND persisted into playersStore (kkoin needs to
+   * survive past this room's lifetime -- lifetime stats already do).
+   */
+  _computeMvpAndKkoin(room) {
+    const players = Array.from(room.players.values());
+    const maxCorrect = players.reduce((m, p) => Math.max(m, p.gameCorrect || 0), 0);
+    room.mvp = maxCorrect > 0
+      ? { nicknames: players.filter(p => (p.gameCorrect || 0) === maxCorrect).map(p => p.nickname), correctCount: maxCorrect }
+      : null;
+
+    const topScore = room.teams.reduce((m, t) => Math.max(m, t.score), -Infinity);
+    const winningTeams = room.teams.filter(t => t.score === topScore);
+    const winningMemberKeys = winningTeams.flatMap(t => t.memberKeys);
+    if (winningMemberKeys.length === 0) { room.kkoinAward = null; return; }
+
+    const perPlayer = Math.floor(config.KKOIN_WIN_POOL / winningMemberKeys.length);
+    const awardedPlayers = [];
+    if (perPlayer > 0) {
+      for (const key of winningMemberKeys) {
+        const player = room.players.get(key);
+        const nickname = player ? player.nickname : key;
+        const updated = playersStore.addKkoin(nickname, perPlayer);
+        awardedPlayers.push({ nickname, newBalance: updated.kkoin });
+      }
+    }
+    room.kkoinAward = {
+      teamNames: winningTeams.map(t => t.name),
+      perPlayer,
+      players: awardedPlayers
+    };
+  }
+
+  // dima 2026-07 request: once a quiz actually concludes, every theme it
+  // used should disappear from the bank for good (not just the existing
+  // soft "prefer unused" tracking in usedThemes.json -- see
+  // themeState.deleteThemesFromBank's own header comment for the
+  // distinction). Called from both ways a room can reach 'finished': the
+  // natural full-completion path in _resolve() above, and the admin's
+  // early endGame() below.
+  _deleteUsedThemesFromBank(room) {
+    const themeIds = [];
+    for (const round of room.rounds) {
+      for (const theme of round.themes) themeIds.push(theme.id);
+    }
+    if (themeIds.length) themeState.deleteThemesFromBank(themeIds);
+  }
+
+  // Admin "Завершити гру" (end early, before all rounds are played). Moved
+  // here from a bare `room.status = 'finished'` inline in socketHandlers.js
+  // so this gets the SAME theme-bank cleanup as a natural finish -- players
+  // already saw these themes this session either way. Deliberately does
+  // NOT call _computeMvpAndKkoin() (unchanged from prior behavior): an
+  // early-ended game has no natural "final" score moment the way a fully
+  // played round-robin does, so awarding KKoin here would need its own
+  // product decision dima hasn't asked for -- out of scope for this change.
+  endGame(room) {
+    if (room.status === 'finished') return { error: 'Гру вже завершено' };
+    room.status = 'finished';
+    this._deleteUsedThemesFromBank(room);
+    room.updatedAt = Date.now();
+    return { ok: true };
   }
 
   submitAnswer(room, nickname, payload) {
@@ -602,6 +797,9 @@ class RoomManager {
       currentRoundIndex: room.currentRoundIndex,
       activeTeamId: this.getActiveTeamId(room),
       teamMusic: room.teamMusic || {}, // teamId -> state|null, see setTeamMusic() doc comment
+      readyCheck: room.status === 'ready_check' ? this.getReadyStatus(room) : null,
+      mvp: room.mvp || null, // set once gameComplete -- see _resolve()
+      kkoinAward: room.kkoinAward || null, // set once gameComplete -- see _resolve()
       // Include the full clue (not just themeId/price) so a player who
       // reconnects or refreshes mid-question can be shown the answer panel
       // right away instead of being stuck looking at a plain board until
@@ -651,4 +849,4 @@ class RoomManager {
   }
 }
 
-module.exports = { RoomManager };
+module.exports = { RoomManager, normalizeAvatar };

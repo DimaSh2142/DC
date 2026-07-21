@@ -1,7 +1,7 @@
 {
-  "name": "dsgame",
-  "version": "1.1.0",
-  "description": "DSGame — командна вікторина у стилі Своя Гра для друзів dima — черга ходів по командах, адмін-панель, автогенератор тем, голосовий чат команд.",
+  "name": "dsland",
+  "version": "2.0.0",
+  "description": "DSLand — ігровий хаб для друзів dima: командна вікторина у стилі Своя Гра (черга ходів, адмін-панель, автогенератор тем, голосовий чат), Морський бій/Шашки/Шахи один-на-один, особистий кабінет з валютою ККоїн, і сторінка Казино.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,9 +11,13 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "chess.js": "^1.4.0",
     "express": "^4.19.2",
     "socket.io": "^4.7.5"
   },
   "license": "UNLICENSED",
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "socket.io-client": "^4.7.5"
+  }
 }
