@@ -78,7 +78,12 @@ body {
   min-height: 100vh;
 }
 
-a { color: var(--turquoise-dark); }
+/* dima 2026-07-21 скрін 1: "забери ці підкреслення" -- без цього правила КОЖЕН
+   <a> на сайті (не лише нав-кнопки на головній) мав типове браузерне
+   підкреслення, бо ніде в цьому файлі раніше не було text-decoration: none.
+   Інтерактивність тут і так позначається кольором/рамкою/тінню, підкреслення
+   зайве на будь-якій сторінці. */
+a { color: var(--turquoise-dark); text-decoration: none; }
 
 h1, h2, h3 { margin: 0 0 .4em 0; line-height: 1.2; }
 
@@ -529,77 +534,155 @@ th { color: var(--turquoise-dark); }
 }
 .fact-button:hover:not(:disabled) { background: var(--orange-dark); }
 
-/* ---- hub homepage (2026-07-21 "глобальний проект" redesign) --------------
-   Replaces the old login-card landing page: big logo where the card used to
-   sit, a top nav row of 3 big buttons (Казино / Міні-ігри / Вікторина), and
-   a small corner icon for the personal cabinet -- matches dima's hand-drawn
-   mockup layout (3 boxes across the top, a 4th smaller one in the corner). */
+/* ---- hub homepage v2 (2026-07-21, dima п.4/5: "скопіюй 1 в 1" сайт, який
+   йому згенерував інший ШІ через base44.com) -------------------------------
+   Повністю темна "обсидіанова" переробка ГОЛОВНОЇ сторінки: розмитий фон з
+   анімованими сферами, скляні (glass) картки-каталог із неоновими акцентами
+   в ТИХ САМИХ трьох кольорах, що й раніше (turquoise=Вікторина,
+   crimson=Казино, orange=Міні-ігри -- просто тепер як світіння на темному, а
+   не рамка на білому), неоновий градієнтний напис "DSLand" -- і поруч
+   РЕАЛЬНИЙ логотип-картинка dima (п.5: "додай ще десь мій логотип", щоб він
+   не загубився за новим стилем), плюс стилізована кнопка "Особистий
+   кабінет" замість колишньої маленької іконки в кутку.
+   Важливо: --hub-* змінні оголошені саме тут, у .hub-page, а НЕ в :root --
+   це навмисно ІНША річ, ніж existing [data-theme="dark"] (перемикач
+   світла/темна тема сайту в налаштуваннях кабінету, який лишається як є й
+   досі за замовчуванням світлий на решті сторінок). Ця обсидіанова
+   естетика -- завжди-темна і стосується лише головної сторінки, тому імена
+   змінних свідомо інші, щоб два різні "темні режими" не плутались. */
 .hub-page {
+  --hub-obsidian: #0A0E16;
+  --hub-surface: rgba(230, 247, 245, 0.05);
+  --hub-surface-border: rgba(230, 247, 245, 0.14);
+  --hub-text: #EAF6F4;
+  --hub-text-dim: rgba(234, 246, 244, 0.62);
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 22px 20px 30px;
+  width: 100%;
+  padding: 22px 20px 40px;
   position: relative;
   text-align: center;
   user-select: none;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 900px 500px at 50% -10%, rgba(23, 184, 166, 0.16), transparent 60%),
+    var(--hub-obsidian);
+  color: var(--hub-text);
 }
-.hub-profile-icon {
-  position: absolute;
-  top: 18px;
-  right: 20px;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface);
-  border: 2px solid var(--turquoise);
-  box-shadow: 0 4px 14px var(--shadow);
-  transition: transform .15s ease;
+
+/* floating blurred spheres -- pure CSS, no canvas/JS needed */
+.hub-bg-spheres { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.hub-sphere { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .45; will-change: transform; }
+.hub-sphere.s1 {
+  width: 380px; height: 380px; left: -100px; top: -80px;
+  background: radial-gradient(circle, var(--turquoise) 0%, transparent 70%);
+  animation: hub-drift-1 22s ease-in-out infinite alternate;
 }
-.hub-profile-icon:hover { transform: scale(1.08); }
-.hub-nav {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 16px;
-  width: 100%;
-  max-width: 720px;
-  margin: 54px 0 10px;
+.hub-sphere.s2 {
+  width: 320px; height: 320px; right: -80px; top: 140px;
+  background: radial-gradient(circle, var(--crimson) 0%, transparent 70%);
+  animation: hub-drift-2 26s ease-in-out infinite alternate;
 }
-.hub-nav-btn {
-  flex: 1 1 180px;
-  max-width: 220px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 22px 16px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 2.5px solid var(--turquoise);
-  color: var(--turquoise-dark);
-  font-weight: 800;
-  font-size: 17px;
-  box-shadow: 0 6px 20px var(--shadow);
-  transition: transform .15s ease, box-shadow .15s ease;
+.hub-sphere.s3 {
+  width: 300px; height: 300px; left: 30%; bottom: -140px;
+  background: radial-gradient(circle, var(--orange) 0%, transparent 70%);
+  animation: hub-drift-3 19s ease-in-out infinite alternate;
 }
-.hub-nav-btn:hover { transform: translateY(-4px); box-shadow: 0 10px 26px var(--shadow); }
-.hub-nav-emoji { font-size: 34px; line-height: 1; }
-.hub-nav-casino { border-color: var(--crimson); color: var(--crimson-dark); }
-.hub-nav-mini { border-color: var(--orange); color: var(--orange-dark); }
-.hub-nav-quiz { border-color: var(--turquoise); color: var(--turquoise-dark); }
-.hub-hero {
-  margin-top: 46px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+@keyframes hub-drift-1 { from { transform: translate(0,0) scale(1); } to { transform: translate(60px,40px) scale(1.12); } }
+@keyframes hub-drift-2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-50px,60px) scale(1.08); } }
+@keyframes hub-drift-3 { from { transform: translate(0,0) scale(1); } to { transform: translate(40px,-30px) scale(1.15); } }
+@media (prefers-reduced-motion: reduce) { .hub-sphere { animation: none; } }
+
+/* top bar: styled "Особистий кабінет" button (dima п.5) */
+.hub-topbar { position: relative; z-index: 2; width: 100%; max-width: 900px; display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.hub-cabinet-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px;
+  border-radius: 99rem;
+  background: var(--hub-surface);
+  border: 1.5px solid var(--hub-surface-border);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  color: var(--hub-text);
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.35);
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
-.hub-logo { width: 340px; max-width: 72vw; height: auto; margin-bottom: 14px; } /* dima 2026-07-21 screenshot 4: "набагато збільши логотип та напис" */
-.hub-title { font-size: 62px; }
-.hub-tagline { color: var(--turquoise-dark); margin: 6px 0 0; font-size: 15px; }
+.hub-cabinet-btn:hover { transform: translateY(-2px); border-color: var(--turquoise); box-shadow: 0 8px 26px rgba(23,184,166,.25); }
+.hub-cabinet-btn-icon { font-size: 16px; }
+
+/* hero: real logo (kept!) + neon gradient "DSLand" wordmark */
+.hub-hero { position: relative; z-index: 2; margin-top: 26px; display: flex; flex-direction: column; align-items: center; }
+.hub-logo-glow {
+  width: 220px; max-width: 58vw; height: auto;
+  border-radius: 28px;
+  margin-bottom: 20px;
+  box-shadow: 0 0 0 1.5px rgba(230,247,245,.18), 0 20px 60px rgba(23,184,166,.35), 0 10px 34px rgba(215,38,61,.18);
+}
+.hub-title-neon {
+  margin: 0;
+  font-weight: 900;
+  letter-spacing: .5px;
+  font-size: 68px;
+  line-height: 1.05;
+  background: linear-gradient(90deg, var(--turquoise) 0%, var(--white) 50%, var(--orange) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 26px rgba(23,184,166,.45)) drop-shadow(0 0 46px rgba(242,153,74,.25));
+}
+.hub-title-neon .accent-neon {
+  background: linear-gradient(90deg, var(--crimson) 0%, var(--orange) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hub-page .hub-tagline { color: var(--hub-text-dim); margin: 10px 0 0; font-size: 16px; font-weight: 500; }
+
+/* catalog: "Три світи. Безліч шляхів." glass card grid (замінює старий рядок з 3 кнопок) */
+.hub-catalog { position: relative; z-index: 2; width: 100%; max-width: 1000px; margin-top: 54px; }
+.hub-catalog-title { font-size: 26px; font-weight: 800; color: var(--hub-text); margin-bottom: 26px; }
+.hub-catalog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px; }
+.hub-card {
+  position: relative;
+  display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 6px;
+  padding: 26px 24px 24px;
+  border-radius: 20px;
+  background: var(--hub-surface);
+  border: 1.5px solid var(--hub-surface-border);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  color: var(--hub-text);
+  overflow: hidden;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.hub-card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(0,0,0,.4); }
+.hub-card-num { position: absolute; top: 18px; right: 22px; font-size: 34px; font-weight: 800; color: rgba(234,246,244,.14); }
+.hub-card-emoji { font-size: 40px; margin-bottom: 6px; }
+.hub-card-title { font-size: 20px; font-weight: 800; }
+.hub-card-sub { font-size: 13px; color: var(--hub-text-dim); margin-bottom: 14px; }
+.hub-card-play { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; letter-spacing: .5px; padding: 8px 16px; border-radius: 99rem; background: rgba(255,255,255,.06); }
+.hub-card-play .arrow { transition: transform .2s ease; }
+.hub-card:hover .hub-card-play .arrow { transform: translateX(4px); }
+.hub-card-turquoise { border-color: rgba(23,184,166,.4); }
+.hub-card-turquoise:hover { border-color: var(--turquoise); box-shadow: 0 18px 40px rgba(23,184,166,.28); }
+.hub-card-turquoise .hub-card-play { color: var(--turquoise); background: rgba(23,184,166,.14); }
+.hub-card-crimson { border-color: rgba(215,38,61,.4); }
+.hub-card-crimson:hover { border-color: var(--crimson); box-shadow: 0 18px 40px rgba(215,38,61,.28); }
+.hub-card-crimson .hub-card-play { color: #ff8b98; background: rgba(215,38,61,.14); }
+.hub-card-orange { border-color: rgba(242,153,74,.4); }
+.hub-card-orange:hover { border-color: var(--orange); box-shadow: 0 18px 40px rgba(242,153,74,.28); }
+.hub-card-orange .hub-card-play { color: var(--orange); background: rgba(242,153,74,.14); }
+
+/* footer: ONLINE status + live UTC clock (see /js/hub.js) */
+.hub-footer { position: relative; z-index: 2; margin-top: 46px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.hub-footer-status { font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--hub-text-dim); display: inline-flex; align-items: center; gap: 6px; }
+.hub-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #3DDC97; box-shadow: 0 0 8px #3DDC97; animation: hub-pulse 1.8s ease-in-out infinite; }
+@keyframes hub-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+.hub-page .footer-note { color: var(--hub-text-dim); }
+
+@media (max-width: 480px) {
+  .hub-title-neon { font-size: 42px; }
+  .hub-logo-glow { width: 150px; }
+  .hub-topbar { justify-content: center; }
+}
 
 /* ---- small "back to hub" link used on every sub-page (quiz/casino/mini-games/profile) ---- */
 .back-link {
@@ -909,3 +992,96 @@ input[type="range"] {
 .chess-cell.selectable { box-shadow: inset 0 0 0 3px var(--orange); }
 .chess-cell.selected { box-shadow: inset 0 0 0 3px var(--crimson); }
 .chess-cell.last-move { box-shadow: inset 0 0 0 3px var(--turquoise); }
+
+/* ---- .btn-12 (dima 2026-07-21, наданий verbatim CSS-компонент) -------------
+   Застосовано до кнопки "Я готовий(ва)" у player.js (renderReadyCheck()) --
+   чорна пігулка з білою рамкою, текст у <span> з mix-blend-mode:difference,
+   на hover по діагоналі проїжджають білі смуги (:before/:after керуються
+   змінною --progress). Код лишений БЕЗ ЗМІН від того, що прислав dima --
+   навіть кольори (#000/#fff) не підлаштовані під 4-кольорову палітру сайту,
+   бо це самодостатній компонент саме в такому вигляді, як його дали. */
+.btn-12,
+.btn-12 *,
+.btn-12 :after,
+.btn-12 :before,
+.btn-12:after,
+.btn-12:before {
+  border: 0 solid;
+  box-sizing: border-box;
+}
+.btn-12 {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: button;
+  background-color: #000;
+  background-image: none;
+  color: #fff;
+  cursor: pointer;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, sans-serif,
+    Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  font-size: 100%;
+  font-weight: 900;
+  line-height: 1.5;
+  margin: 0;
+  -webkit-mask-image: -webkit-radial-gradient(#000, #fff);
+  padding: 0;
+  text-transform: uppercase;
+}
+.btn-12:disabled {
+  cursor: default;
+}
+.btn-12:-moz-focusring {
+  outline: auto;
+}
+.btn-12 svg {
+  display: block;
+  vertical-align: middle;
+}
+.btn-12 [hidden] {
+  display: none;
+}
+.btn-12 {
+  border-radius: 99rem;
+  border-width: 2px;
+  overflow: hidden;
+  padding: 0.8rem 3rem;
+  position: relative;
+}
+.btn-12 span {
+  mix-blend-mode: difference;
+}
+.btn-12:after,
+.btn-12:before {
+  background: linear-gradient(
+    90deg,
+    #fff 25%,
+    transparent 0,
+    transparent 50%,
+    #fff 0,
+    #fff 75%,
+    transparent 0
+  );
+  content: "";
+  inset: 0;
+  position: absolute;
+  transform: translateY(var(--progress, 100%));
+  transition: transform 0.2s ease;
+}
+.btn-12:after {
+  --progress: -100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 25%,
+    #fff 0,
+    #fff 50%,
+    transparent 0,
+    transparent 75%,
+    #fff 0
+  );
+  z-index: -1;
+}
+.btn-12:hover:after,
+.btn-12:hover:before {
+  --progress: 0;
+}

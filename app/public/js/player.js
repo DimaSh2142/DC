@@ -315,9 +315,9 @@
     } else if (iAmReady) {
       readyBoxChildren.push(el('p', { style: 'font-weight:700; color:var(--turquoise-dark);' }, ['✅ Ви готові! Очікуємо інших учасників…']));
     } else {
-      readyBoxChildren.push(el('button', { onclick: () => {
+      readyBoxChildren.push(el('button', { class: 'btn-12', onclick: () => {
         socket.emit('player:set_ready', {}, (res) => { if (res && res.error) toast(res.error, true); });
-      }}, ['Я готовий(ва)']));
+      }}, [el('span', {}, ['Я готовий(ва)'])]));
     }
     if (rc.pendingNicknames.length) {
       readyBoxChildren.push(el('p', { style: 'font-size:12px; color:var(--turquoise-dark); margin-top:12px;' }, ['Очікуємо: ' + rc.pendingNicknames.join(', ')]));

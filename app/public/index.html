@@ -9,34 +9,59 @@
 </head>
 <body>
   <div class="hub-page">
-    <a href="/profile.html" class="hub-profile-icon" title="Особистий кабінет" aria-label="Особистий кабінет">
-      <img src="/img/profile-icon.svg" alt="" width="26" height="26">
-    </a>
+    <div class="hub-bg-spheres" aria-hidden="true">
+      <span class="hub-sphere s1"></span>
+      <span class="hub-sphere s2"></span>
+      <span class="hub-sphere s3"></span>
+    </div>
 
-    <nav class="hub-nav">
-      <a href="/casino.html" class="hub-nav-btn hub-nav-casino">
-        <span class="hub-nav-emoji">🎰</span>
-        <span>Казино</span>
+    <div class="hub-topbar">
+      <a href="/profile.html" class="hub-cabinet-btn">
+        <span class="hub-cabinet-btn-icon">🔑</span>
+        <span>Особистий кабінет</span>
       </a>
-      <a href="/minigames.html" class="hub-nav-btn hub-nav-mini">
-        <span class="hub-nav-emoji">🎮</span>
-        <span>Міні-ігри</span>
-      </a>
-      <a href="/quiz.html" class="hub-nav-btn hub-nav-quiz">
-        <span class="hub-nav-emoji">🧠</span>
-        <span>Вікторина</span>
-      </a>
-    </nav>
+    </div>
 
     <div class="hub-hero">
-      <img src="/img/logo.jpg" alt="DSLand" class="hub-logo">
-      <h1 class="brand-title hub-title">DS<span class="accent">Land</span></h1>
+      <img src="/img/logo.jpg" alt="DSLand" class="hub-logo-glow">
+      <h1 class="hub-title-neon">DS<span class="accent-neon">Land</span></h1>
       <p class="hub-tagline">Обери, у що граємо сьогодні.</p>
     </div>
 
-    <p class="footer-note">Made by DimaSh</p>
+    <div class="hub-catalog">
+      <h2 class="hub-catalog-title">Три світи. Безліч шляхів.</h2>
+      <div class="hub-catalog-grid">
+        <a href="/casino.html" class="hub-card hub-card-crimson">
+          <span class="hub-card-num">01</span>
+          <span class="hub-card-emoji">🎰</span>
+          <span class="hub-card-title">Казино</span>
+          <span class="hub-card-sub">Постав ККоїни й лови удачу в Крампус Казино.</span>
+          <span class="hub-card-play">ГРАТИ <span class="arrow">→</span></span>
+        </a>
+        <a href="/minigames.html" class="hub-card hub-card-orange">
+          <span class="hub-card-num">02</span>
+          <span class="hub-card-emoji">🎮</span>
+          <span class="hub-card-title">Міні-ігри</span>
+          <span class="hub-card-sub">Морський бій, шашки, шахи й бульбашки — один на один.</span>
+          <span class="hub-card-play">ГРАТИ <span class="arrow">→</span></span>
+        </a>
+        <a href="/quiz.html" class="hub-card hub-card-turquoise">
+          <span class="hub-card-num">03</span>
+          <span class="hub-card-emoji">🧠</span>
+          <span class="hub-card-title">Вікторина</span>
+          <span class="hub-card-sub">Командна гра у стилі «Своя Гра»: черга ходів, теми, адмін-панель.</span>
+          <span class="hub-card-play">ГРАТИ <span class="arrow">→</span></span>
+        </a>
+      </div>
+    </div>
+
+    <div class="hub-footer">
+      <span class="hub-footer-status"><span class="hub-status-dot"></span>ONLINE · <span id="hub-utc-clock">--:--</span> UTC</span>
+      <p class="footer-note">Made by DimaSh</p>
+    </div>
   </div>
 
   <script src="/js/common.js"></script>
+  <script src="/js/hub.js"></script>
 </body>
 </html>
