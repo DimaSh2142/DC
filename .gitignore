@@ -27,3 +27,9 @@ app/server_smoke.log
 
 # large private reference pack — not meant for public distribution
 reference/
+
+# raw asset dumps dima drops in between sessions (zips/rars/vox source
+# files) -- staging only, never the final committed asset. Whatever gets
+# actually used ends up processed (e.g. rendered to PNG) under app/public/img/
+# or app/public/audio/ instead, same pattern as every other asset pack.
+_staging_assets/
