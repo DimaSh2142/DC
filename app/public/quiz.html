@@ -29,6 +29,13 @@
         <img src="/img/logo.jpg" alt="DSLand" style="width:88px; height:auto; border-radius:20px; margin-bottom:22px; box-shadow:0 0 0 1.5px rgba(230,247,245,.18), 0 14px 34px rgba(23,184,166,.3);">
         <div class="stack">
           <a href="/player.html"><button class="btn-12" style="width:100%;"><span>Я гравець — приєднатись до гри</span></button></a>
+          <!-- dima 2026-07-22 (сьогоднішній баг): цей лінк випадково зник разом
+               з <script src="/js/quiz.js"> нижче в тому ж коміті, що прибирав
+               "виставлену напоказ" адмін-кнопку -- але quiz.js ВЖЕ ховає її
+               для будь-кого, крім акаунта з role:'admin' (див. той файл),
+               так само як admin-grant-panel в кабінеті. Видаливши весь
+               <a>, я заодно зламав кнопку і для тебе самого як адміна. -->
+          <a href="/admin.html" id="admin-panel-link"><button class="btn-small btn-outline" style="width:100%;">Адмін-панель</button></a>
         </div>
       </div>
 
@@ -41,6 +48,7 @@
   </div>
 
   <script src="/js/common.js"></script>
+  <script src="/js/quiz.js"></script>
   <script src="/js/hub.js"></script>
 </body>
 </html>

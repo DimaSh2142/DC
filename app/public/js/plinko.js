@@ -11,10 +11,12 @@
 (function () {
   const socket = io();
   const app = document.getElementById('app');
-  const ROWS = 10;
-  // 2026-07-22 rebalance -- kept in sync with games/plinko.js's MULTIPLIERS
-  // by hand (see file header: this copy is display-only).
-  const MULTIPLIERS = [100, 30, 10, 3, 1, 0.5, 1, 3, 10, 30, 100];
+  // 2026-07-22 "набагато більше квадратиків... і з такими ж іксами" (dima's
+  // reference screenshot) -- kept in sync with games/plinko.js's own
+  // ROWS/MULTIPLIERS by hand (see that file's header: this copy is
+  // display-only, the server never trusts anything computed here).
+  const ROWS = 16;
+  const MULTIPLIERS = [1000, 100, 20, 10, 4, 2, 0.2, 0.2, 0.2, 0.2, 0.2, 2, 4, 10, 20, 100, 1000];
 
   let nickname = null;
   let balance = 0;
@@ -58,12 +60,21 @@
   }
 
   function buildSlotsRow(landedIndex) {
-    // "edge" gold styling covers the same top-3-of-6 tiers as before the
-    // 2026-07-22 rebalance (was m>=26 -> 1000/130/26; now m>=10 -> 100/30/10),
-    // so the proportion of the row that reads as a "big win" stays the same.
+    // "edge" gold styling: m>=10 covers the top 4 of 7 distinct values
+    // (1000/100/20/10 gold, 4/2/0.2 not) -- roughly the same "about half the
+    // row reads as a big win" proportion the two rebalances before this one
+    // (2026-07-22) also aimed for, just against the new 17-slot number set.
+    // Two-line "1000 / x" label (number over a small "x") instead of a
+    // single "×1000" string -- with 17 slots crammed into the row now
+    // (up from 11), that's the only way "1000" and "0.2" both stay readable
+    // instead of wrapping or overflowing their cell. Matches dima's
+    // reference screenshot, which already labels its slots this same way.
     return el('div', { class: 'pk-slots-row', id: 'pk-slots-row' }, MULTIPLIERS.map((m, i) => el('div', {
       class: 'pk-slot' + (m >= 10 ? ' edge' : '') + (landedIndex === i ? ' landed' : '')
-    }, ['×' + m])));
+    }, [
+      el('div', { class: 'pk-slot-num' }, [String(m)]),
+      el('div', { class: 'pk-slot-x' }, ['x'])
+    ])));
   }
 
   function render() {
@@ -167,10 +178,15 @@
     if (typeof playEffect === 'function') {
       const anchor = document.querySelector('.pk-slot.landed');
       if (anchor) {
-        if (res.multiplier >= 100) playEffect('lightning', anchor);
-        else if (res.multiplier >= 30) playEffect('firework', anchor);
-        else if (res.multiplier >= 3) playEffect('coin-burst', anchor);
-        else if (res.multiplier <= 0.5) playEffect('poison', anchor);
+        // Retiered for the new 17-slot table (2026-07-22 board rebuild) --
+        // 1000x is a brand-new, ~16x rarer top tier than the old max (100x),
+        // so it gets its own biggest/rarest sprite (explosion, previously
+        // unused by Plinko) instead of sharing "lightning" with 100x.
+        if (res.multiplier >= 1000) playEffect('explosion', anchor);
+        else if (res.multiplier >= 100) playEffect('lightning', anchor);
+        else if (res.multiplier >= 10) playEffect('firework', anchor);
+        else if (res.multiplier >= 2) playEffect('coin-burst', anchor);
+        else if (res.multiplier <= 0.2) playEffect('poison', anchor);
       }
     }
   }

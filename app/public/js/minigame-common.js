@@ -210,7 +210,16 @@ function mgFinishedBanner(myIdx, winnerIdx, resignedIdx, drawReason, onRematch, 
     }
   }
 
-  return el('div', { class: 'card mg-finished-banner', style: 'text-align:center; margin:14px 0; border-color:var(--orange);' }, [
+  // dima 2026-07-22 скрін хрестиків-нуликів: "не можна було курсором
+  // наклацати" (looked bad highlighted like normal text when
+  // click-dragged) + "хай цей напис у всіх іграх буде по центру екрана" --
+  // user-select:none kills the highlight, and max-width+margin:auto makes
+  // this a genuinely centered card instead of a full-width .card with only
+  // its TEXT centered inside (which could sit off-center-looking on a wide
+  // screen depending on ambient layout). Applies to all 4 games that call
+  // this function (tictactoe/battleship/chess/checkers), not just the one
+  // dima screenshotted.
+  return el('div', { class: 'card mg-finished-banner', style: 'text-align:center; margin:14px auto; max-width:420px; border-color:var(--orange); user-select:none;' }, [
     el('div', { style: 'font-size:22px; font-weight:800;' }, [title]),
     sub ? el('div', { style: 'font-size:13px; color:var(--turquoise-dark); margin-top:6px;' }, [sub]) : null,
     stakeLine ? el('div', { style: 'font-size:14px; font-weight:700; color:var(--orange); margin-top:8px;' }, [stakeLine]) : null,

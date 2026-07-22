@@ -18,9 +18,14 @@ const reportsStore = require('../state/reportsStore');
 function buildAuthRouter() {
   const router = express.Router();
 
-  router.post('/register', (req, res) => {
+  // dima 2026-07-22 "довгенько підгружає" -- createAccount/verifyLogin are
+  // async now (see accountsStore.js's hashPasswordAsync comment for why:
+  // password hashing is deliberately CPU-heavy, and running it off the main
+  // thread stops one person's login from stalling everyone else's requests).
+  // These two routes just need `async`+`await` to match.
+  router.post('/register', async (req, res) => {
     const { login, password } = req.body || {};
-    const result = accountsStore.createAccount(login, password);
+    const result = await accountsStore.createAccount(login, password);
     if (result.error) return res.status(400).json({ error: result.error });
     const token = authSessions.createSession(result.account);
     res.json({ token, login: result.account.login, role: result.account.role });
@@ -30,12 +35,12 @@ function buildAuthRouter() {
   // header comment) -- profile.js's gate form uses ACCOUNT_NOT_FOUND to
   // decide "this nickname has no account yet, create one with the password
   // just typed" instead of showing a dead-end error.
-  router.post('/login', (req, res) => {
+  router.post('/login', async (req, res) => {
     const { login, password } = req.body || {};
     if (!accountsStore.accountExists(login)) {
       return res.status(404).json({ error: 'Акаунту з таким нікнеймом ще немає', code: 'ACCOUNT_NOT_FOUND' });
     }
-    const account = accountsStore.verifyLogin(login, password);
+    const account = await accountsStore.verifyLogin(login, password);
     if (!account) return res.status(401).json({ error: 'Невірний пароль', code: 'BAD_PASSWORD' });
     const token = authSessions.createSession(account);
     res.json({ token, login: account.login, role: account.role });

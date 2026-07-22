@@ -1813,6 +1813,7 @@ body.ds-dark-body .room-code { color: #ff5c72; }
 .bj-result-banner {
   border-radius: 14px; border: 1.5px solid; padding: 14px 34px; font-weight: 800; font-size: 24px;
   letter-spacing: -.5px; background: rgba(8,8,8,.7); backdrop-filter: blur(16px); display: inline-block;
+  user-select: none; /* dima 2026-07-22 "не можна було курсором наклацати" -- same fix as mg-finished-banner, applied across every game's result text */
 }
 
 .bj-controls { margin-top: 28px; }
@@ -1919,7 +1920,7 @@ body.ds-dark-body .room-code { color: #ff5c72; }
 .rl-reel-cell.red { background: #D7263D; }
 .rl-reel-cell.black { background: #1a1a1a; }
 .rl-reel-cell.green { background: #1f9d63; }
-.rl-reel-result-line { text-align: center; font-family: ui-monospace, monospace; font-size: 13px; font-weight: 700; color: var(--ds-text-dim); margin-top: -8px; }
+.rl-reel-result-line { text-align: center; font-family: ui-monospace, monospace; font-size: 13px; font-weight: 700; color: var(--ds-text-dim); margin-top: -8px; user-select: none; }
 
 .rl-seats-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
 .rl-seat { width: 156px; border-radius: 14px; border: 1.5px solid var(--ds-border); background: rgba(255,255,255,.02); padding: 12px; text-align: center; }
@@ -1932,14 +1933,21 @@ body.ds-dark-body .room-code { color: #ff5c72; }
 .rl-seat-bets { margin-top: 6px; font-size: 10px; color: var(--ds-text-dimmer); line-height: 1.5; }
 
 /* ---- Plinko (2026-07-22, Казино Phase 3) -- solo, no table needed. ---- */
-.pk-board { position: relative; width: 100%; max-width: 480px; height: 280px; margin: 20px auto 0; border-radius: 14px; border: 1.5px solid var(--ds-border); background: rgba(0,0,0,.25); overflow: hidden; }
-.pk-peg { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.22); transform: translate(-50%, -50%); }
-.pk-ball { position: absolute; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #00FFD1 60%, #049); box-shadow: 0 0 10px #00FFD1; transform: translate(-50%, -50%); transition: left .28s cubic-bezier(.4,0,.2,1), top .28s cubic-bezier(.4,0,.2,1); z-index: 3; }
-.pk-slots-row { display: flex; max-width: 480px; margin: 0 auto; }
-.pk-slot { flex: 1; text-align: center; padding: 8px 2px; font-size: 10px; font-weight: 800; border-top: 2px solid var(--ds-border); color: var(--ds-text-dimmer); transition: background .2s ease, color .2s ease, border-color .2s ease; }
+/* 2026-07-22 board rebuild (dima's reference screenshot: "набагато більше
+   квадратиків" -- 16 peg rows instead of 10, 17 slots instead of 11) --
+   board/slots widened+heightened to give the ~2.3x peg count (152 vs 65)
+   and the narrower 17-wide slot row room to breathe; sized against
+   .ds-shell's 1080px cap, nowhere close to overflowing it. */
+.pk-board { position: relative; width: 100%; max-width: 640px; height: 400px; margin: 20px auto 0; border-radius: 14px; border: 1.5px solid var(--ds-border); background: rgba(0,0,0,.25); overflow: hidden; }
+.pk-peg { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.22); transform: translate(-50%, -50%); }
+.pk-ball { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #00FFD1 60%, #049); box-shadow: 0 0 10px #00FFD1; transform: translate(-50%, -50%); transition: left .28s cubic-bezier(.4,0,.2,1), top .28s cubic-bezier(.4,0,.2,1); z-index: 3; }
+.pk-slots-row { display: flex; max-width: 640px; margin: 0 auto; user-select: none; }
+.pk-slot { flex: 1; text-align: center; padding: 6px 1px; border-top: 2px solid var(--ds-border); color: var(--ds-text-dimmer); transition: background .2s ease, color .2s ease, border-color .2s ease; }
+.pk-slot-num { font-size: 10px; font-weight: 800; line-height: 1.2; }
+.pk-slot-x { font-size: 7px; font-weight: 700; opacity: .75; line-height: 1; }
 .pk-slot.edge { color: #DAA520; }
 .pk-slot.landed { background: rgba(0,255,209,.18); color: #00FFD1; border-top-color: #00FFD1; }
-.pk-result-line { text-align: center; margin-top: 14px; font-size: 16px; font-weight: 800; }
+.pk-result-line { text-align: center; margin-top: 14px; font-size: 16px; font-weight: 800; user-select: none; }
 .pk-result-line.pos { color: #00FFD1; }
 .pk-result-line.neg { color: #C71585; }
 
@@ -1985,6 +1993,7 @@ body.ds-dark-body .room-code { color: #ff5c72; }
   position: absolute; inset: 0; z-index: 5; display: none;
   flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
   background: rgba(5,5,10,.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  user-select: none;
 }
 .bub-overlay.show { display: flex; }
 .bub-overlay-icon {

@@ -54,6 +54,30 @@ function hashPassword(password, salt) {
   return crypto.scryptSync(String(password), salt, SCRYPT_KEYLEN).toString('hex');
 }
 
+// dima 2026-07-22 "дуже глючить... довгенько підгружає" -- register/login
+// (createAccount/verifyLogin below) used to call the SYNC hashPassword
+// above. scryptSync is deliberately CPU-heavy (that's what makes it a good
+// password hash), and being synchronous, it BLOCKS Node's single event-loop
+// thread for its whole duration -- while any one player's login/register is
+// hashing, the entire server (everyone else's cabinet fetches, mini-game
+// moves, quiz sockets, everything) just queues up behind it. That's exactly
+// the "cabinet feels slow, registration feels slow, both around the same
+// time" symptom: unrelated requests were stuck waiting on someone else's
+// scrypt call, not on their own work.
+// Async crypto.scrypt still does the same expensive computation, but Node
+// runs it on the libuv threadpool instead of the JS main thread, so the
+// event loop stays free to keep serving everyone else while it runs.
+// seedAdminIfMissing() below is deliberately left on the sync version --
+// it's a one-time call on server boot, before anyone can even make a
+// request yet, so blocking there costs nothing real.
+function hashPasswordAsync(password, salt) {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(String(password), salt, SCRYPT_KEYLEN, (err, key) => {
+      if (err) reject(err); else resolve(key.toString('hex'));
+    });
+  });
+}
+
 function seedAdminIfMissing() {
   const key = keyOf(SEED_ADMIN_LOGIN);
   if (cache[key]) return;
@@ -96,7 +120,7 @@ function listAccounts() {
  * (case-insensitively, same as a nickname clash elsewhere in this app) --
  * callers should present that as "log in instead".
  */
-function createAccount(login, password) {
+async function createAccount(login, password) {
   const trimmed = String(login || '').trim().slice(0, 24);
   if (!trimmed) return { error: 'Введіть нікнейм' };
   if (!password || String(password).length < MIN_PASSWORD_LEN) {
@@ -106,10 +130,14 @@ function createAccount(login, password) {
   const key = keyOf(trimmed);
   if (data[key]) return { error: 'Цей нікнейм вже має акаунт — спробуй увійти паролем' };
   const salt = crypto.randomBytes(16).toString('hex');
+  const hash = await hashPasswordAsync(password, salt);
+  // re-check after the await -- two registrations for the same nickname
+  // could both have passed the check above before either finished hashing
+  if (data[key]) return { error: 'Цей нікнейм вже має акаунт — спробуй увійти паролем' };
   data[key] = {
     login: trimmed,
     salt,
-    hash: hashPassword(password, salt),
+    hash,
     role: 'player',
     createdAt: new Date().toISOString()
   };
@@ -126,10 +154,10 @@ function createAccount(login, password) {
  * profile.js's combined login/register flow relies on it to decide whether
  * to auto-register.
  */
-function verifyLogin(login, password) {
+async function verifyLogin(login, password) {
   const account = getAccount(login);
   if (!account) return null;
-  const candidateHash = hashPassword(password, account.salt);
+  const candidateHash = await hashPasswordAsync(password, account.salt);
   const a = Buffer.from(candidateHash, 'hex');
   const b = Buffer.from(account.hash, 'hex');
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;

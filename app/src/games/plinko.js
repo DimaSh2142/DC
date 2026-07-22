@@ -15,7 +15,7 @@
 // landing in either far-edge slot requires 10 bounces the SAME direction in
 // a row, a 1-in-1024 (~0.098%) event.
 //
-// 2026-07-22 rebalance (dima, looking at the live multiplier row: "самий
+// 2026-07-22 rebalance #1 (dima, looking at the live multiplier row: "самий
 // правий і лівий були х100 [було х1000], все інше посунулось і справа і
 // зліва від 0.5 будуть х1 [було х2]"): edge slots cut 1000x -> 100x, the
 // two slots flanking the centre cut 2x -> 1x. dima didn't specify the two
@@ -23,8 +23,19 @@
 // geometric ramp from the new 1x up to the new 100x (1, 3, 10, 30, 100 is
 // 3.16^0..3.16^4 rounded to clean numbers) so "все інше посунулось" reads as
 // one consistent curve rather than an arbitrary jump.
-const ROWS = 10;
-const MULTIPLIERS = [100, 30, 10, 3, 1, 0.5, 1, 3, 10, 30, 100]; // index = slot, length ROWS+1
+//
+// 2026-07-22 rebalance #2 (dima sent a reference screenshot: "щоб набагато
+// більше було квадратиків стільки як на другому скріні і з такими ж
+// іксами" -- many more peg rows, matching that screenshot's board density,
+// with its exact multiplier row). ROWS doubled 10 -> 16 (11 -> 17 slots) and
+// MULTIPLIERS replaced wholesale with the screenshot's own 17 values (a
+// wide flat 0.2x band across the 5 middle slots -- landing anywhere near
+// centre out of 16 bounces is the overwhelmingly likely outcome, same
+// "edge-heavy payout, centre-weighted path" shape as rebalance #1, just a
+// taller board). The public/js/plinko.js client copy must be kept in sync
+// by hand (see that file's header comment).
+const ROWS = 16;
+const MULTIPLIERS = [1000, 100, 20, 10, 4, 2, 0.2, 0.2, 0.2, 0.2, 0.2, 2, 4, 10, 20, 100, 1000]; // index = slot, length ROWS+1
 
 function simulatePath(rows) {
   const r = Number.isInteger(rows) ? rows : ROWS;

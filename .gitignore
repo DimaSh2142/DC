@@ -17,6 +17,11 @@ app/data/activity.json
 # player-submitted ideas/complaints ("система репортів", 2026-07-22,
 # src/state/reportsStore.js) -- same "runtime state, not source" reasoning
 app/data/reports.json
+# orphaned temp files from jsonStore.js's write-then-rename atomic-write
+# pattern (data/*.json.tmp-<pid>-<ts>) -- only left behind if the process
+# gets killed mid-write between the write and the rename; harmless, but
+# shouldn't clutter git status if one is ever lying around
+app/data/*.tmp-*
 
 # user-submitted SiGame packs ("Закинь українізовану SiGame" button) — may
 # contain copyrighted third-party media, same reasoning as reference/ below;
