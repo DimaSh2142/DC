@@ -28,9 +28,21 @@ function mgRenderJoinScreen(socket, app, opts) {
   function renderActualJoinScreen(nickname) {
     const nickInput = el('input', { type: 'text', value: nickname, maxlength: '24', readonly: 'readonly', title: 'Нікнейм визначається акаунтом -- вийти можна в Особистому кабінеті' });
     const codeInput = el('input', { type: 'text', placeholder: 'Код кімнати', maxlength: '8', style: 'text-transform:uppercase; letter-spacing:3px; font-weight:700;' });
+    // dima 2026-07-22 "якщо я хочу зіграти на гроші (KKoins) чому я ніде не
+    // можу це поставити" -- optional stake, only settable by whoever CREATES
+    // the room (see miniGameManager.createRoom/joinRoom: the joiner just has
+    // to match it, they don't choose their own number). 0/empty = normal
+    // free game, unchanged from before this feature existed.
+    const stakeInput = el('input', { type: 'number', min: '0', step: '1', placeholder: '0', value: '0', style: 'max-width:120px;' });
+    const balanceLabel = el('span', { style: 'font-size:12px; color:var(--turquoise-dark);' }, ['']);
+    fetch('/api/profile/' + encodeURIComponent(nickname)).then(r => r.json()).then((data) => {
+      const kkoin = data && data.profile && data.profile.kkoin;
+      balanceLabel.textContent = 'Баланс: ' + (Number.isFinite(kkoin) ? kkoin : 0) + ' KKoin';
+    }).catch(() => {});
 
     function doCreate() {
-      socket.emit('mg:create_room', { gameType: opts.gameType, nickname }, (res) => {
+      const stake = Math.max(0, Math.floor(Number(stakeInput.value) || 0));
+      socket.emit('mg:create_room', { gameType: opts.gameType, nickname, stake }, (res) => {
         if (res.error) return toast(res.error, true);
         localStorage.setItem(mgRoomStorageKey(opts.gameType), res.room.code);
         opts.onJoined({ roomCode: res.room.code, playerIdx: res.playerIdx, room: res.room });
@@ -53,12 +65,17 @@ function mgRenderJoinScreen(socket, app, opts) {
         el('div', { style: 'text-align:center; font-size:40px; margin-bottom:6px;' }, [opts.emoji]),
         el('h1', { style: 'text-align:center; margin-top:0;' }, [opts.gameLabel]),
         el('div', { class: 'field' }, [el('label', {}, ['Граєш як']), nickInput]),
+        el('div', { class: 'field' }, [
+          el('div', { class: 'row between', style: 'align-items:baseline;' }, [el('label', { style: 'margin:0;' }, ['Ставка (KKoin), необов’язково']), balanceLabel]),
+          stakeInput
+        ]),
         el('div', { class: 'stack' }, [
           el('button', { onclick: doCreate }, ['Створити нову гру']),
           el('div', { class: 'row', style: 'align-items:flex-end;' }, [
             el('div', { class: 'field', style: 'flex:1; margin-bottom:0;' }, [el('label', {}, ['Або приєднатись за кодом']), codeInput]),
             el('button', { class: 'btn-outline', onclick: doJoin }, ['Приєднатись'])
-          ])
+          ]),
+          el('p', { style: 'font-size:11px; color:var(--turquoise-dark); text-align:center; margin:2px 0 0;' }, ['Якщо у кімнати є ставка, той хто приєднується має мати стільки ж KKoin -- сума спишеться з обох одразу, як гра почнеться, і переможець забирає банк.'])
         ])
       ])
     ]));
@@ -68,12 +85,14 @@ function mgRenderJoinScreen(socket, app, opts) {
 
 function mgRenderWaitingForOpponent(app, roomCode, opts) {
   clear(app);
+  const stake = opts && opts.stake;
   app.appendChild(el('div', { class: 'center-screen', style: 'min-height:80vh;' }, [
     el('div', { class: 'card', style: 'max-width:420px; width:100%; text-align:center;' }, [
       el('a', { href: '/minigames.html', class: 'back-link' }, ['← До міні-ігор']),
       el('h2', {}, ['Очікуємо суперника…']),
       el('p', {}, ['Надішліть цей код другові:']),
       el('div', { class: 'room-code' }, [roomCode]),
+      stake > 0 ? el('p', { style: 'font-weight:700; color:var(--orange); margin-top:10px;' }, ['\u{1FA99} Гра на ставку: ' + stake + ' KKoin (спишеться з обох, щойно суперник приєднається)']) : null,
       opts && opts.extra ? opts.extra : null
     ])
   ]));
@@ -83,18 +102,25 @@ function mgRenderWaitingForOpponent(app, roomCode, opts) {
 // whose turn it is (caller-provided text) and a resign button. Kept as a
 // DOM-node factory (not a full render) so each game's own renderBattle()-
 // style function can just splice it into its own layout.
-function mgResignBar(socket, statusText) {
-  return el('div', { class: 'row between', style: 'margin:10px 0;' }, [
-    el('strong', {}, [statusText]),
+function mgResignBar(socket, statusText, stake) {
+  return el('div', { class: 'row between', style: 'margin:10px 0; align-items:center;' }, [
+    el('div', {}, [
+      el('strong', {}, [statusText]),
+      stake > 0 ? el('div', { style: 'font-size:12px; color:var(--orange); font-weight:700;' }, ['\u{1FA99} Банк: ' + (stake * 2) + ' KKoin']) : null
+    ]),
     el('button', { class: 'btn-small btn-outline crimson', onclick: () => {
-      if (confirm('Здатися? Суперник отримає перемогу.')) socket.emit('mg:resign', {}, (res) => { if (res && res.error) toast(res.error, true); });
+      if (confirm('Здатися? Суперник отримає перемогу.' + (stake > 0 ? (' Ставку (' + stake + ' KKoin) буде втрачено.') : ''))) socket.emit('mg:resign', {}, (res) => { if (res && res.error) toast(res.error, true); });
     }}, ['Здатися'])
   ]);
 }
 
 // winnerIdx: 0|1|null (null covers both "draw" and "not-a-real-answer" --
 // callers pass drawReason separately when relevant, e.g. chess stalemate).
-function mgFinishedBanner(myIdx, winnerIdx, resignedIdx, drawReason) {
+// dima 2026-07-22 "чому після гри я не можу запустити нову" -- onRematch (якщо
+// переданий) малює кнопку "Грати знову" поруч із "До міні-ігор". Викликач сам
+// вирішує, що саме відбувається по кліку (зазвичай -- socket.emit('mg:rematch', ...)),
+// цей файл нічого не знає про socket/gameType конкретної гри.
+function mgFinishedBanner(myIdx, winnerIdx, resignedIdx, drawReason, onRematch, stake) {
   let title, sub = null;
   if (drawReason) {
     title = '\u{1F91D} Нічия';
@@ -106,10 +132,29 @@ function mgFinishedBanner(myIdx, winnerIdx, resignedIdx, drawReason) {
     title = '\u{1F614} Ви програли';
     if (resignedIdx === myIdx) sub = 'Ви здалися.';
   }
+  // dima 2026-07-22 "якщо я хочу зіграти на гроші (KKoins)" -- payout already
+  // happened server-side the instant the room became "finished" (see
+  // miniGameManager.settleStakes); this is purely the after-the-fact summary
+  // line, matching whatever the server actually did.
+  let stakeLine = null;
+  if (stake > 0) {
+    if (drawReason) stakeLine = '\u{1FA99} Нічия -- ставку (' + stake + ' KKoin) повернено обом.';
+    else if (winnerIdx === myIdx) stakeLine = '\u{1FA99} Ви забрали банк: ' + (stake * 2) + ' KKoin.';
+    else stakeLine = '\u{1FA99} Ставку втрачено: -' + stake + ' KKoin.';
+  }
+  const rematchBtn = onRematch ? el('button', {
+    style: 'margin-top:12px; margin-right:8px;',
+    onclick: (e) => {
+      e.currentTarget.disabled = true;
+      onRematch();
+    }
+  }, ['\u{1F501} Грати знову']) : null;
   return el('div', { class: 'card', style: 'text-align:center; margin:14px 0; border-color:var(--orange);' }, [
     el('div', { style: 'font-size:22px; font-weight:800;' }, [title]),
     sub ? el('div', { style: 'font-size:13px; color:var(--turquoise-dark); margin-top:6px;' }, [sub]) : null,
-    el('a', { href: '/minigames.html' }, [el('button', { style: 'margin-top:12px;' }, ['До міні-ігор'])])
+    stakeLine ? el('div', { style: 'font-size:14px; font-weight:700; color:var(--orange); margin-top:8px;' }, [stakeLine]) : null,
+    rematchBtn,
+    el('a', { href: '/minigames.html' }, [el('button', { class: 'btn-outline', style: 'margin-top:12px;' }, ['До міні-ігор'])])
   ]);
 }
 

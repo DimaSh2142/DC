@@ -38,7 +38,7 @@
   function render() {
     clear(app);
     if (!roomState) return;
-    if (roomState.status === 'waiting') return mgRenderWaitingForOpponent(app, roomCode);
+    if (roomState.status === 'waiting') return mgRenderWaitingForOpponent(app, roomCode, { stake: roomState.stake });
     if (roomState.status === 'finished') return renderFinishedScreen();
     if (roomState.gameState.phase === 'placing') return renderPlacement();
     return renderBattle();
@@ -110,7 +110,7 @@
       el('h2', {}, ['🚢 Морський бій']),
       el('span', { class: 'badge outline' }, ['Кімната ' + roomCode])
     ]));
-    wrap.appendChild(mgResignBar(socket, gs.turn === playerIdx ? 'Ваш хід! Стріляйте у флот суперника.' : 'Хід суперника…'));
+    wrap.appendChild(mgResignBar(socket, gs.turn === playerIdx ? 'Ваш хід! Стріляйте у флот суперника.' : 'Хід суперника…', roomState.stake));
 
     const boardsRow = el('div', { class: 'mg-boards-row' }, []);
 
@@ -174,7 +174,12 @@
 
   function renderFinishedScreen() {
     const wrap = el('div', {}, [el('h2', { style: 'text-align:center;' }, ['🚢 Морський бій'])]);
-    wrap.appendChild(mgFinishedBanner(playerIdx, roomState.gameState.winnerIdx, roomState.resignedIdx, null));
+    wrap.appendChild(mgFinishedBanner(playerIdx, roomState.gameState.winnerIdx, roomState.resignedIdx, null, () => {
+      socket.emit('mg:rematch', { gameType: GAME_TYPE, roomCode }, (res) => {
+        if (res && res.error) { toast(res.error, true); render(); return; }
+        placements = []; // скинути локально застейджений флот попереднього раунду
+      });
+    }, roomState.stake));
     app.appendChild(wrap);
   }
 

@@ -571,12 +571,13 @@ th { color: var(--turquoise-dark); }
   text-align: center;
   user-select: none;
   overflow-x: hidden;
-  /* dima 2026-07-22: гало за заголовком тепер magenta (rgba(199,21,133,...)),
-     не turquoise -- у реальному base44-експорті (Hero.jsx) саме таке гало
-     сидить точно за словом "DSLand". */
-  background:
-    radial-gradient(ellipse 900px 500px at 50% -10%, rgba(199, 21, 133, 0.16), transparent 60%),
-    var(--hub-obsidian);
+  /* dima 2026-07-22 (скрін 4 -- "зроби низ такий самий з чорним фоном"):
+     гало раніше висіло тут, на .hub-page, спільне для hero+каталог+футер.
+     Тепер .hub-page -- суцільний чорний фон, а гало (magenta, як за словом
+     "DSLand" у реальному Hero.jsx) переїхало власне на .hub-hero нижче --
+     так воно фізично не може "просвічувати" в каталог/футер, які лежать
+     НИЖЧЕ hero в потоці й мають свій незалежний чистий чорний фон. */
+  background: var(--hub-obsidian);
   color: var(--hub-text);
 }
 
@@ -609,8 +610,8 @@ th { color: var(--turquoise-dark); }
 @keyframes hub-drift-3 { from { transform: translate(0,0) scale(1); } to { transform: translate(40px,-30px) scale(1.15); } }
 @media (prefers-reduced-motion: reduce) { .hub-sphere { animation: none; } }
 
-/* top bar: styled "Особистий кабінет" button (dima п.5) */
-.hub-topbar { position: relative; z-index: 2; width: 100%; max-width: 900px; display: flex; justify-content: flex-end; margin-bottom: 8px; }
+/* top bar: styled "Особистий кабінет" button (dima п.5, 2026-07-22: максимально вліво) */
+.hub-topbar { position: relative; z-index: 2; width: 100%; max-width: 900px; display: flex; justify-content: flex-start; margin-bottom: 8px; }
 .hub-cabinet-btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 20px;
@@ -646,6 +647,9 @@ th { color: var(--turquoise-dark); }
   min-height: 82vh;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 20px 20px 70px;
+  /* dima 2026-07-22: гало переїхало сюди з .hub-page (див. коментар там) --
+     тепер воно фізично не може лізти в каталог/футер нижче. */
+  background: radial-gradient(ellipse 900px 500px at 50% 10%, rgba(199, 21, 133, 0.16), transparent 60%);
 }
 .hub-scroll-hint {
   position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
@@ -668,7 +672,12 @@ th { color: var(--turquoise-dark); }
   margin: 0;
   font-weight: 900;
   letter-spacing: .5px;
-  font-size: 68px;
+  /* dima 2026-07-22 "розмір не той" -- фіксовані 68px не масштабувались під
+     ширину екрана. У референсі (Hero.jsx) це clamp(3.5rem,12vw,9rem) -- на
+     широкому моніторі вордмарка займає набагато більше місця, ніж
+     фіксований px. Той самий clamp тут. Мобільний @media нижче й далі
+     підстраховує зверху на дуже вузьких екранах. */
+  font-size: clamp(3.5rem, 12vw, 9rem);
   line-height: 1.05;
 }
 /* .letter-d/.letter-s кольори (окремо) без глоу-тіні -- використовуються і в
@@ -715,8 +724,14 @@ th { color: var(--turquoise-dark); }
   color: var(--hub-text);
   overflow: hidden;
   transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  /* dima 2026-07-22 "крутиш колесиком туди-сюди і картки зникають" -- відомий
+     Chrome/Edge рендер-глюк: backdrop-filter+overflow:hidden без власного
+     стабільного compositing-шару іноді "губиться" під час швидкого скролу.
+     translateZ(0) примусово виносить картку на свій GPU-шар, що це чинить. */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
-.hub-card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(0,0,0,.4); }
+.hub-card:hover { transform: translateY(-6px) translateZ(0); box-shadow: 0 18px 40px rgba(0,0,0,.4); }
 .hub-card-num { position: absolute; top: 22px; right: 26px; font-size: 34px; font-weight: 800; color: rgba(234,246,244,.14); }
 .hub-card-emoji { font-size: 44px; margin: 10px 0 16px; }
 .hub-card-title { font-size: 28px; font-weight: 800; }

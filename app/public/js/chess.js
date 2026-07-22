@@ -29,7 +29,7 @@
   function render() {
     clear(app);
     if (!roomState) return;
-    if (roomState.status === 'waiting') return mgRenderWaitingForOpponent(app, roomCode);
+    if (roomState.status === 'waiting') return mgRenderWaitingForOpponent(app, roomCode, { stake: roomState.stake });
     if (roomState.status === 'finished') return renderFinishedScreen();
     renderGame();
   }
@@ -60,7 +60,7 @@
     ]));
     let statusText = myTurn ? 'Ваш хід!' : 'Хід суперника…';
     if (gs.inCheck && (gs.winnerIdx === null && !gs.drawReason)) statusText += ' Шах!';
-    wrap.appendChild(mgResignBar(socket, statusText));
+    wrap.appendChild(mgResignBar(socket, statusText, roomState.stake));
 
     const destsFromSelected = selected ? gs.legalMoves.filter(m => m.from === selected) : [];
     const destToSet = new Set(destsFromSelected.map(m => m.to));
@@ -113,7 +113,9 @@
   function renderFinishedScreen() {
     const gs = roomState.gameState;
     const wrap = el('div', {}, [el('h2', { style: 'text-align:center;' }, ['♟️ Шахи'])]);
-    wrap.appendChild(mgFinishedBanner(playerIdx, gs.winnerIdx, roomState.resignedIdx, gs.drawReason));
+    wrap.appendChild(mgFinishedBanner(playerIdx, gs.winnerIdx, roomState.resignedIdx, gs.drawReason, () => {
+      socket.emit('mg:rematch', { gameType: GAME_TYPE, roomCode }, (res) => { if (res && res.error) { toast(res.error, true); render(); } });
+    }, roomState.stake));
     app.appendChild(wrap);
   }
 

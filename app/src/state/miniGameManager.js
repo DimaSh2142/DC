@@ -38,6 +38,13 @@ class MiniGameRoom {
     this.players = []; // [{ key, nickname, avatar, socketId, connected }] -- array index IS playerIdx (0 or 1)
     this.gameState = null; // opaque, owned entirely by GAME_MODULES[gameType]
     this.resignedIdx = null; // set if a player explicitly resigned (still funnels through "finished" + winnerIdx from the game state where applicable)
+    // dima 2026-07-22 "якщо я хочу зіграти на гроші (KKoins)" -- optional bet,
+    // set once at room creation and never changed for that room's lifetime
+    // (a rematch re-uses the same amount, see rematch() below). 0 means "not
+    // a staked room" everywhere in this file. stakeSettled guards against
+    // ever paying out (or refunding) the same room's pot twice.
+    this.stake = 0;
+    this.stakeSettled = false;
   }
 }
 
@@ -49,14 +56,24 @@ class MiniGameManager {
   isValidGameType(gameType) { return Object.prototype.hasOwnProperty.call(GAME_MODULES, gameType); }
   gameLabel(gameType) { return GAME_LABELS[gameType] || gameType; }
 
-  createRoom(gameType, nickname, socketId, avatar) {
+  createRoom(gameType, nickname, socketId, avatar, stake) {
     if (!this.isValidGameType(gameType)) return { error: 'Невідомий тип гри' };
     const key = playersStore.keyOf(nickname);
     if (!key) return { error: 'Порожній нікнейм' };
-    playersStore.getOrCreatePlayer(nickname);
+    const profile = playersStore.getOrCreatePlayer(nickname);
+    // dima 2026-07-22 "якщо я хочу зіграти на гроші (KKoins) чому я ніде не
+    // можу це поставити" -- the creator picks the stake once, up front;
+    // whoever joins later must match it (see joinRoom below). Floor+clamp so
+    // a negative/fractional/garbage value from the client can never sneak
+    // through as a "stake".
+    const stakeAmt = Math.max(0, Math.floor(Number(stake) || 0));
+    if (stakeAmt > 0 && (profile.kkoin || 0) < stakeAmt) {
+      return { error: 'Недостатньо KKoin для такої ставки (у вас ' + (profile.kkoin || 0) + ')' };
+    }
     let code;
     do { code = randomCode(4); } while (this.rooms.has(code));
     const room = new MiniGameRoom(code, gameType);
+    room.stake = stakeAmt;
     room.players.push({ key, nickname: String(nickname).trim(), avatar: avatar || null, socketId, connected: true });
     this.rooms.set(code, room);
     return { room };
@@ -95,6 +112,18 @@ class MiniGameManager {
     }
     if (room.players.length >= 2) return { error: 'Кімната вже заповнена (2/2 гравці)' };
 
+    // A staked room (room.stake set by the creator, see createRoom above)
+    // requires the joiner to affort the same amount BEFORE they take the
+    // second seat -- reject the join outright rather than seating them and
+    // discovering the shortfall only once the game is about to start. The
+    // creator's own balance was already checked when they created the room.
+    if (room.stake > 0) {
+      const joinerProfile = playersStore.getOrCreatePlayer(nickname);
+      if ((joinerProfile.kkoin || 0) < room.stake) {
+        return { error: 'Потрібно ' + room.stake + ' KKoin для цієї ставки (у вас ' + (joinerProfile.kkoin || 0) + ')' };
+      }
+    }
+
     const player = { key, nickname: String(nickname).trim(), avatar: avatar || null, socketId, connected: true };
     room.players.push(player);
     const playerIdx = room.players.length - 1;
@@ -102,6 +131,13 @@ class MiniGameManager {
     if (room.players.length === 2 && room.status === 'waiting') {
       room.status = 'playing';
       room.gameState = GAME_MODULES[room.gameType].createInitialState();
+      // Both balances were already verified affordable (creator above at
+      // createRoom-time, joiner just above) -- the actual deduction only
+      // ever happens here, at the instant the room genuinely starts, so a
+      // room nobody ever joins never touches anyone's KKoin.
+      if (room.stake > 0) {
+        room.players.forEach(p => playersStore.addKkoin(p.nickname, -room.stake));
+      }
     }
     return { room, player, playerIdx, reconnect: false };
   }
@@ -126,7 +162,58 @@ class MiniGameManager {
     room.resignedIdx = playerIdx;
     if (room.gameState) room.gameState.winnerIdx = 1 - playerIdx;
     room.updatedAt = Date.now();
+    this.settleStakes(room);
     return { ok: true, winnerIdx: 1 - playerIdx };
+  }
+
+  // Pays out a staked room's pot the instant it becomes "finished" -- the
+  // winner gets both stakes back (their own + the loser's), or on a draw
+  // each player just gets their own stake back. Guarded by stakeSettled so
+  // this can safely be called from every "just became finished" call site
+  // (resign, applyModuleResult) without ever double-paying if both happened
+  // to fire for the same room (they can't in practice, but cheap to guard).
+  settleStakes(room) {
+    if (room.stake <= 0 || room.stakeSettled) return;
+    room.stakeSettled = true;
+    const winnerIdx = room.gameState && room.gameState.winnerIdx;
+    if (winnerIdx === 0 || winnerIdx === 1) {
+      const winner = room.players[winnerIdx];
+      if (winner) playersStore.addKkoin(winner.nickname, room.stake * 2);
+    } else {
+      // draw (chess stalemate/etc, drawReason set but no winnerIdx) -- nobody
+      // profits, both simply get their own stake back.
+      room.players.forEach(p => playersStore.addKkoin(p.nickname, room.stake));
+    }
+  }
+
+  // dima 2026-07-22 "чому після гри я не можу запустити нову" -- рематч у
+  // ТІЙ САМІЙ кімнаті (той самий код, ті самі 2 гравці) замість змушувати
+  // когось заново створювати кімнату й ділитись кодом. room.players.reverse()
+  // навмисно тут: воно міняє місцями playerIdx 0<->1 (хто ходить першим/грає
+  // білими), щоб рематчі чесно чергувались, а не завжди той самий гравець
+  // мав перевагу першого ходу. Обидва гравці мають бути на місці (2/2) --
+  // інакше після дисконекту суперника "рематч" підвісив би room у
+  // status:'playing' без опонента.
+  rematch(room) {
+    if (room.status !== 'finished') return { error: 'Гра ще не завершена' };
+    if (room.players.length < 2) return { error: 'Суперник ще не приєднався' };
+    // A staked room re-stakes the SAME amount for the rematch -- both
+    // players must still be able to afford it (their balances moved since
+    // the last game: the winner just got paid, the loser just paid out), so
+    // re-check and re-deduct BEFORE touching any room state, and bail
+    // cleanly (finished room untouched) if either can't cover it anymore.
+    if (room.stake > 0) {
+      const short = room.players.find(p => (playersStore.getOrCreatePlayer(p.nickname).kkoin || 0) < room.stake);
+      if (short) return { error: short.nickname + ' не має достатньо KKoin для рематчу на ту ж ставку (' + room.stake + ')' };
+      room.players.forEach(p => playersStore.addKkoin(p.nickname, -room.stake));
+    }
+    room.players.reverse();
+    room.status = 'playing';
+    room.resignedIdx = null;
+    room.stakeSettled = false;
+    room.gameState = GAME_MODULES[room.gameType].createInitialState();
+    room.updatedAt = Date.now();
+    return { ok: true };
   }
 
   applyModuleResult(room, result) {
@@ -140,6 +227,7 @@ class MiniGameManager {
     if (room.gameState && room.gameState.drawReason) {
       room.status = 'finished';
     }
+    if (room.status === 'finished') this.settleStakes(room);
     return result;
   }
 
@@ -156,6 +244,7 @@ class MiniGameManager {
       gameLabel: this.gameLabel(room.gameType),
       status: room.status,
       resignedIdx: room.resignedIdx,
+      stake: room.stake,
       players: room.players.map(p => ({ nickname: p.nickname, avatar: p.avatar, connected: p.connected })),
       myPlayerIdx: viewerPlayerIdx,
       gameState: room.gameState ? mod.getPublicView(room.gameState, viewerPlayerIdx) : null

@@ -23,7 +23,7 @@
   function render() {
     clear(app);
     if (!roomState) return;
-    if (roomState.status === 'waiting') return mgRenderWaitingForOpponent(app, roomCode);
+    if (roomState.status === 'waiting') return mgRenderWaitingForOpponent(app, roomCode, { stake: roomState.stake });
     if (roomState.status === 'finished') return renderFinishedScreen();
     renderGame();
   }
@@ -36,7 +36,7 @@
       el('h2', {}, ['🔴 Шашки']),
       el('span', { class: 'badge outline' }, ['Кімната ' + roomCode])
     ]));
-    wrap.appendChild(mgResignBar(socket, myTurn ? 'Ваш хід!' + (gs.mustContinueFrom ? ' (обовʼязкове продовження взяття)' : '') : 'Хід суперника…'));
+    wrap.appendChild(mgResignBar(socket, myTurn ? 'Ваш хід!' + (gs.mustContinueFrom ? ' (обовʼязкове продовження взяття)' : '') : 'Хід суперника…', roomState.stake));
 
     const selectableFromSet = new Set(gs.legalMoves.map(m => m.from.join(',')));
     const destsFromSelected = selected ? gs.legalMoves.filter(m => m.from[0] === selected[0] && m.from[1] === selected[1]) : [];
@@ -89,7 +89,9 @@
 
   function renderFinishedScreen() {
     const wrap = el('div', {}, [el('h2', { style: 'text-align:center;' }, ['🔴 Шашки'])]);
-    wrap.appendChild(mgFinishedBanner(playerIdx, roomState.gameState.winnerIdx, roomState.resignedIdx, null));
+    wrap.appendChild(mgFinishedBanner(playerIdx, roomState.gameState.winnerIdx, roomState.resignedIdx, null, () => {
+      socket.emit('mg:rematch', { gameType: GAME_TYPE, roomCode }, (res) => { if (res && res.error) { toast(res.error, true); render(); } });
+    }, roomState.stake));
     app.appendChild(wrap);
   }
 

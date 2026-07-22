@@ -42,8 +42,9 @@ function registerMiniGameHandlers(io, { miniGameManager }) {
       const gameType = payload && payload.gameType;
       const nickname = (payload && payload.nickname || '').trim().slice(0, 24);
       const avatar = payload && payload.avatar;
+      const stake = payload && payload.stake;
       if (!nickname) return cb && cb({ error: 'Введіть нікнейм' });
-      const result = miniGameManager.createRoom(gameType, nickname, socket.id, avatar);
+      const result = miniGameManager.createRoom(gameType, nickname, socket.id, avatar, stake);
       if (result.error) return cb && cb({ error: result.error });
 
       socket.data.mgRoomCode = result.room.code;
@@ -155,6 +156,18 @@ function registerMiniGameHandlers(io, { miniGameManager }) {
       const { room, idx } = currentRoomAndIdx(socket);
       if (!room || idx === -1 || idx === undefined) return cb && cb({ error: 'Ви не в кімнаті' });
       const result = miniGameManager.resign(room, idx);
+      if (result.error) return cb && cb({ error: result.error });
+      broadcastRoomState(room);
+      if (cb) cb({ ok: true });
+    }));
+
+    // dima 2026-07-22: "Грати знову" на екрані фіналу -- будь-який з двох
+    // гравців може запросити рематч, спрацьовує одразу (без окремого
+    // підтвердження другого гравця, як і решта цього trust-based додатку).
+    socket.on('mg:rematch', safe(async (payload, cb) => {
+      const { room, idx } = currentRoomAndIdx(socket);
+      if (!room || idx === -1 || idx === undefined) return cb && cb({ error: 'Ви не в кімнаті' });
+      const result = miniGameManager.rematch(room);
       if (result.error) return cb && cb({ error: result.error });
       broadcastRoomState(room);
       if (cb) cb({ ok: true });
