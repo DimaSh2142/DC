@@ -1938,9 +1938,15 @@ body.ds-dark-body .room-code { color: #ff5c72; }
    board/slots widened+heightened to give the ~2.3x peg count (152 vs 65)
    and the narrower 17-wide slot row room to breathe; sized against
    .ds-shell's 1080px cap, nowhere close to overflowing it. */
-.pk-board { position: relative; width: 100%; max-width: 640px; height: 400px; margin: 20px auto 0; border-radius: 14px; border: 1.5px solid var(--ds-border); background: rgba(0,0,0,.25); overflow: hidden; }
-.pk-peg { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.22); transform: translate(-50%, -50%); }
-.pk-ball { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #00FFD1 60%, #049); box-shadow: 0 0 10px #00FFD1; transform: translate(-50%, -50%); transition: left .28s cubic-bezier(.4,0,.2,1), top .28s cubic-bezier(.4,0,.2,1); z-index: 3; }
+/* 2026-07-22 canvas rewrite (dima's base44 PlinkoBoard.jsx reference --
+   "перебери зіп і знайди там плінко, використай його") -- .pk-board now
+   just frames a single <canvas> (pegs/ball/trail all drawn in JS) instead
+   of the old absolutely-positioned .pk-peg/.pk-ball divs; aspect-ratio
+   keeps the canvas's CSS box proportional to its BW×BH drawing buffer
+   (public/js/plinko.js) at any width, same responsive trick the reference
+   used (style={{width:'100%', height:'auto', aspectRatio: W+'/'+H}}). */
+.pk-board { position: relative; width: 100%; max-width: 640px; margin: 20px auto 0; border-radius: 14px; border: 1.5px solid var(--ds-border); background: rgba(0,0,0,.25); overflow: hidden; }
+.pk-canvas { display: block; width: 100%; height: auto; aspect-ratio: 640 / 400; }
 .pk-slots-row { display: flex; max-width: 640px; margin: 0 auto; user-select: none; }
 .pk-slot { flex: 1; text-align: center; padding: 6px 1px; border-top: 2px solid var(--ds-border); color: var(--ds-text-dimmer); transition: background .2s ease, color .2s ease, border-color .2s ease; }
 .pk-slot-num { font-size: 10px; font-weight: 800; line-height: 1.2; }
@@ -1950,6 +1956,13 @@ body.ds-dark-body .room-code { color: #ff5c72; }
 .pk-result-line { text-align: center; margin-top: 14px; font-size: 16px; font-weight: 800; user-select: none; }
 .pk-result-line.pos { color: #00FFD1; }
 .pk-result-line.neg { color: #C71585; }
+/* dima 2026-07-22 "додай можливість запускати одночасно 1, 5, 10 та 25
+   куль" -- ball-count preset row, same look/spacing as the existing
+   .bj-bet-row stake presets right below it, just its own row so "how many
+   balls" and "how much per ball" read as two separate choices. */
+.pk-ballcount-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.pk-ballcount-btn { min-width: 40px; }
+.pk-total-cost-hint { text-align: center; font-size: 11px; color: var(--ds-text-dimmer); margin-top: 8px; }
 
 /* ---- Бульбашки (2026-07-22 visual overhaul) -- dima uploaded an updated
    base44 reference (BubbleShooter.jsx/Bubble.jsx) purely for its LOOK

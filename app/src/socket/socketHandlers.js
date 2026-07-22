@@ -2,11 +2,16 @@
 //
 // Security note: admin-only actions are gated by `socket.isAdmin`, which is
 // only set to true after a socket sends `admin:authenticate` with a token
-// that adminAuth.isValid() accepts (issued at POST /api/admin/login after
-// checking the real password). Players cannot reach privileged actions by
-// emitting the raw event names directly -- every admin handler re-checks
-// `socket.isAdmin` server-side on every call, it is not just hidden in the
-// UI. This satisfies "players can't reach admin functions even via API".
+// that EITHER adminAuth.isValid() accepts (issued at POST /api/admin/login
+// after checking the standalone admin password) OR is a live cabinet
+// session (authSessions.js) whose account has role 'admin' -- see that
+// handler below for the 2026-07-22 addition (dima: "я і так адмін по
+// персональному кабінету... і це вікно непотрібно", admin.html no longer
+// has its own password form and authenticates with the cabinet token
+// instead). Players cannot reach privileged actions by emitting the raw
+// event names directly -- every admin handler re-checks `socket.isAdmin`
+// server-side on every call, it is not just hidden in the UI. This
+// satisfies "players can't reach admin functions even via API".
 //
 // Public vs. admin state: roomManager.publicState() is what players see;
 // roomManager.adminState() is a superset that additionally exposes the
@@ -22,6 +27,7 @@
 
 const themeState = require('../state/themeState');
 const playersStore = require('../state/playersStore');
+const authSessions = require('../state/authSessions');
 
 function safe(handler) {
   return async function (...args) {
@@ -113,10 +119,24 @@ function registerSocketHandlers(io, { roomManager, adminAuth }) {
       if (adminAuth.isValid(token)) {
         socket.isAdmin = true;
         if (cb) cb({ ok: true });
-      } else {
-        socket.isAdmin = false;
-        if (cb) cb({ error: 'Недійсний токен' });
+        return;
       }
+      // dima 2026-07-22 "я і так адмін по персональному кабінету... і це
+      // вікно непотрібно" -- admin.html no longer has its own standalone
+      // password form, it authenticates with whatever cabinet token this
+      // browser already has (see authSessions.js). A cabinet session is
+      // only sufficient here if its account role is actually 'admin' --
+      // an ordinary player's valid-but-non-admin token still gets rejected
+      // exactly like before, same as it would for any other admin-only
+      // action.
+      const session = authSessions.getSession(token);
+      if (session && session.role === 'admin') {
+        socket.isAdmin = true;
+        if (cb) cb({ ok: true });
+        return;
+      }
+      socket.isAdmin = false;
+      if (cb) cb({ error: 'Недійсний токен' });
     }));
 
     // ---------- ADMIN ACTIONS ----------

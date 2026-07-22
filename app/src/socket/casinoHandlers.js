@@ -280,6 +280,21 @@ function registerCasinoHandlers(io, { blackjackManager, blackjackTableManager, r
       if (result.error) return cb && cb({ error: result.error });
       if (cb) cb(result);
     }));
+
+    // dima 2026-07-22 "додай можливість запускати одночасно 1, 5, 10 та 25
+    // куль" -- separate event (not a `count` param bolted onto plinko_drop
+    // above) so the original single-ball path stays completely untouched;
+    // plinkoManager.dropMany() is just a validated loop around the same
+    // drop() this older handler already calls.
+    socket.on('casino:plinko_drop_many', safe(async (payload, cb) => {
+      const nickname = (payload && payload.nickname || '').trim().slice(0, 24);
+      const stake = payload && payload.stake;
+      const count = payload && payload.count;
+      if (!nickname) return cb && cb({ error: 'Введіть нікнейм' });
+      const result = plinkoManager.dropMany(nickname, stake, count);
+      if (result.error) return cb && cb({ error: result.error });
+      if (cb) cb(result);
+    }));
   });
 }
 

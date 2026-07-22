@@ -1,15 +1,55 @@
+// admin.html dashboard logic. Room-hosting controls for the quiz (create
+// rooms, assign teams, generate the board, watch/adjust a live game).
+//
+// 2026-07-22 auth rework (dima: "забери цю адмін панель в вікторині, якщо я
+// і так адмін по персональному кабінету, то там додатковий пароль і це
+// вікно непотрібно") -- this page no longer has its OWN standalone password
+// form. It now reuses the same cabinet login every other page here already
+// has (see common.js's getAuth()): if this browser already holds an
+// admin-role account token, the dashboard opens immediately with zero extra
+// prompts -- exactly the flow dima gets by clicking the "Адмін-панель"
+// button on quiz.html, which (see quiz.js) only ever shows to an admin-role
+// account in the first place, so a valid token is already guaranteed to be
+// sitting in localStorage by the time this page loads that way.
+//
+// The actual security boundary is still 100% server-side and unchanged in
+// spirit -- see socketHandlers.js's admin:authenticate, which now accepts
+// EITHER the original standalone admin password token (adminAuth.js, kept
+// working as a dormant fallback, just no longer surfaced anywhere in this
+// UI) OR a cabinet session token whose role is 'admin' (authSessions.js).
+// Every admin-only socket event still independently re-checks
+// socket.isAdmin server-side, exactly as before this change -- nothing
+// about WHAT is allowed changed, only HOW a browser proves it up front.
+//
+// 2026-07-22 visual rework (dima: "онови адмін панель... більш гарнішим і
+// технологічнішим все зроби") -- re-skinned onto the same .ds-page/.ds-panel
+// glass system profile.html/casino.html/minigames.html/plinko.html already
+// use, instead of the older plain .card layout. Purely a rendering-layer
+// change: every socket event, state variable, and business rule below
+// (SCORE_STEP, controlsDraft defaults, etc.) is exactly the same logic as
+// before -- just wrapped in different container classes.
+//
+// 2026-07-22 (dima: "видали вставлення музики (тільки у адміна)") -- the
+// host-side YouTube "Музика (для ведучого)" panel and all its player
+// plumbing (renderMusicPanel, playYouTubeUrl/pause/stop, the hidden
+// #ytMusicPlayer host div) have been removed outright. Players' own
+// in-team music (team_music, a totally separate feature living in
+// player.js) is untouched.
 (function () {
   const app = document.getElementById('app');
-  let token = localStorage.getItem('sigame_admin_token') || null;
+  let token = null;
   let socket = null;
   let authed = false;
+  // Distinguishes "still checking the cabinet token" from "checked, and
+  // this browser definitely isn't an admin" so renderLogin() doesn't flash
+  // the wrong message while the silent handshake in boot() is in flight.
+  let authStatus = 'checking'; // 'checking' | 'need-login' | 'not-admin'
 
   let rooms = [];
   let selected = null;       // admin:room_state for the selected room (superset of room:state -- see roomManager.adminState)
   let lastResolved = null;   // last answer:resolved payload for selected room
   let playerStats = [];
   let bankStats = null;
-  let musicUrlDraft = '';    // in-progress typed YouTube URL (same "survive re-render" pattern as controlsDraft)
 
   // ---- live "time left" countdown for the room being watched (point 8) ----
   // Mirrors player.js's own startTimer()/stopTimer(), driven by the same
@@ -39,8 +79,13 @@
           socket.emit('admin:watch_lobby', {}, (r) => { rooms = (r && r.rooms) || []; render(); });
           bindAdminEvents();
         } else {
+          // Cabinet token didn't authenticate as admin (not an admin-role
+          // login, or an old/expired token) -- do NOT touch localStorage's
+          // shared 'sigame_auth' here, that's the whole cabinet session and
+          // other pages still need it; only this page's own in-memory
+          // `token` gets dropped.
           authed = false;
-          localStorage.removeItem('sigame_admin_token');
+          authStatus = 'not-admin';
           token = null;
           render();
         }
@@ -130,16 +175,16 @@
     startAdminTimer(key, Math.max(1000, r.activeQuestion.msRemaining || 45000));
   }
 
-  // ---------------- actions ----------------
-  function login(password) {
-    fetch('/api/admin/login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password })
-    }).then(r => r.json()).then(data => {
-      if (data.error) return toast(data.error, true);
-      token = data.token;
-      localStorage.setItem('sigame_admin_token', token);
+  // ---------------- boot / actions ----------------
+  function boot() {
+    const cabinetAuth = getAuth();
+    if (cabinetAuth && cabinetAuth.token) {
+      token = cabinetAuth.token;
       connectSocket();
-    }).catch(() => toast('Не вдалося зв’язатися з сервером', true));
+    } else {
+      authStatus = 'need-login';
+      render();
+    }
   }
 
   function createRoom() {
@@ -176,38 +221,61 @@
     renderDashboard();
   }
 
-  function renderLogin() {
-    const pw = el('input', { type: 'password', placeholder: 'Пароль адміністратора' });
-    const form = el('form', { class: 'stack', onsubmit: (e) => { e.preventDefault(); login(pw.value); } }, [
-      el('div', { class: 'field' }, [el('label', {}, ['Пароль']), pw]),
-      el('button', { type: 'submit' }, ['Увійти'])
+  function pageShellStart(narrow) {
+    return el('div', { class: 'ds-page' }, [
+      el('div', { class: 'hub-bg-spheres', 'aria-hidden': 'true' }, [
+        el('span', { class: 'hub-sphere s1' }, []),
+        el('span', { class: 'hub-sphere s2' }, []),
+        el('span', { class: 'hub-sphere s3' }, [])
+      ]),
+      el('div', { class: 'ds-shell' + (narrow ? ' ds-shell-narrow' : '') }, [
+        el('div', { class: 'ds-topbar' }, [
+          el('a', { href: '/', class: 'back-link ds-back-link' }, ['← На головну']),
+          el('span', { class: 'ds-brand-mark' }, [el('b', {}, ['DSLAND']), ' · ADMIN'])
+        ])
+      ])
     ]);
-    app.appendChild(el('div', { class: 'center-screen', style: 'min-height:80vh;' }, [
-      el('div', { class: 'card', style: 'max-width:380px; width:100%;' }, [
-        el('img', { src: '/img/logo.jpg', alt: 'DSLand', style: 'display:block; width:100px; height:auto; margin:0 auto 10px;' }),
-        el('h2', { style: 'text-align:center;' }, ['Адмін-панель DSLand']),
-        form
+  }
+
+  function renderLogin() {
+    const checking = authStatus === 'checking';
+    const message = checking
+      ? 'Перевірка прав доступу…'
+      : authStatus === 'not-admin'
+        ? 'Цей акаунт не має прав адміністратора.'
+        : 'Увійдіть у свій акаунт в особистому кабінеті, щоб відкрити адмін-панель.';
+    const page = pageShellStart(true);
+    const shell = page.children[1];
+    shell.appendChild(el('div', { class: 'center-screen', style: 'min-height:60vh;' }, [
+      el('div', { class: 'ds-panel', style: 'max-width:380px; width:100%; text-align:center;' }, [
+        el('img', { src: '/img/logo.jpg', alt: 'DSLand', style: 'display:block; width:80px; height:auto; margin:0 auto 14px; border-radius:14px;' }),
+        el('h2', { style: 'margin-bottom:10px;' }, ['Адмін-панель DSLand']),
+        el('p', { style: 'color:var(--ds-text-dim); font-size:14px; line-height:1.5;' }, [message]),
+        !checking ? el('a', { href: '/profile.html', class: 'btn-small', style: 'display:inline-block; margin-top:14px; text-decoration:none;' }, ['Особистий кабінет →']) : null
       ])
     ]));
+    app.appendChild(page);
   }
 
   function renderDashboard() {
-    const wrap = el('div', {}, []);
-    wrap.appendChild(el('div', { class: 'row between' }, [
-      el('div', { class: 'row', style: 'align-items:center; gap:10px;' }, [
-        el('img', { src: '/img/logo.jpg', alt: 'DSLand', style: 'width:40px; height:auto;' }),
-        el('h2', {}, ['Адмін-панель'])
+    const page = pageShellStart(false);
+    const shell = page.children[1];
+
+    shell.appendChild(el('div', { style: 'display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:24px;' }, [
+      el('div', {}, [
+        el('div', { class: 'ds-eyebrow' }, ['/ Керування вікториною']),
+        el('h1', { class: 'ds-heading', style: 'font-size:32px; margin-bottom:0;' }, ['Адмін-панель'])
       ]),
-      el('button', { class: 'btn-outline', onclick: createRoom }, ['+ Нова кімната'])
+      el('button', { class: 'btn-small', onclick: createRoom }, ['+ Нова кімната'])
     ]));
 
-    wrap.appendChild(el('div', { class: 'row' }, rooms.map(r =>
-      el('button', { class: (selected && selected.code === r.code) ? '' : 'btn-outline', onclick: () => selectRoom(r.code) },
+    shell.appendChild(el('div', { class: 'row', style: 'margin-bottom:6px;' }, rooms.map(r =>
+      el('button', { class: 'btn-small' + ((selected && selected.code === r.code) ? '' : ' btn-outline'), onclick: () => selectRoom(r.code) },
         [r.code + ' · ' + r.players.length + ' гравців · ' + statusLabel(r.status)])
     )));
 
-    if (selected) wrap.appendChild(renderRoomManager());
-    app.appendChild(wrap);
+    if (selected) shell.appendChild(renderRoomManager());
+    app.appendChild(page);
   }
 
   function statusLabel(s) {
@@ -216,17 +284,18 @@
 
   function renderRoomManager() {
     const r = selected;
-    const box = el('div', { class: 'card', style: 'margin-top:18px;' }, []);
+    const sections = [];
 
-    box.appendChild(el('div', { class: 'row between' }, [
-      el('div', {}, [el('span', { class: 'room-code', style: 'font-size:30px;' }, [r.code])]),
+    // ---- room header strip: code + live status ----
+    sections.push(el('div', { class: 'ds-panel', style: 'display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; padding:18px 24px;' }, [
+      el('span', { class: 'room-code', style: 'font-size:30px;' }, [r.code]),
       el('span', { class: 'badge outline' }, [statusLabel(r.status)])
     ]));
 
     // Soft (non-blocking) headcount hint -- dima's spec targets 6-14 players.
     // This never stops the host from starting anyway, it's just a nudge.
     if (r.status === 'lobby' && r.players.length > 0 && (r.players.length < 6 || r.players.length > 14)) {
-      box.appendChild(el('div', { class: 'warn-banner' }, [
+      sections.push(el('div', { class: 'warn-banner' }, [
         r.players.length < 6
           ? ('Зараз лише ' + r.players.length + ' гравців(я) -- гра розрахована на 6-14. Можна почати й так, це просто підказка.')
           : ('Зараз ' + r.players.length + ' гравців -- більше за рекомендовані 14. Можна почати й так, але подумайте про 4-5 команд і перевірте зручність екрану.')
@@ -240,28 +309,30 @@
     // forever) and a cancel-back-to-lobby escape hatch.
     if (r.status === 'ready_check') {
       const rc = r.readyCheck || { readyCount: 0, totalCount: 0, pendingNicknames: [] };
-      box.appendChild(el('div', { class: 'card', style: 'margin:14px 0; border-color:var(--orange);' }, [
-        el('h3', { style: 'margin-top:0;' }, ['Очікування готовності гравців']),
-        el('div', { style: 'font-size:20px; font-weight:800; color:var(--turquoise-dark); margin-bottom:8px;' }, [rc.readyCount + ' / ' + rc.totalCount + ' готові']),
-        rc.pendingNicknames.length ? el('p', { style: 'font-size:13px; color:var(--turquoise-dark);' }, ['Очікуємо: ' + rc.pendingNicknames.join(', ')]) : el('p', { style: 'font-size:13px; color:var(--turquoise-dark);' }, ['Всі готові -- гра ось-ось почнеться автоматично.']),
+      sections.push(el('div', { class: 'ds-panel', style: 'border-color:var(--orange);' }, [
+        el('div', { class: 'ds-panel-label' }, ['⏳ Очікування готовності гравців']),
+        el('div', { style: 'font-size:20px; font-weight:800; color:var(--ds-mint); margin-bottom:8px;' }, [rc.readyCount + ' / ' + rc.totalCount + ' готові']),
+        rc.pendingNicknames.length ? el('p', { style: 'font-size:13px; color:var(--ds-text-dim);' }, ['Очікуємо: ' + rc.pendingNicknames.join(', ')]) : el('p', { style: 'font-size:13px; color:var(--ds-text-dim);' }, ['Всі готові -- гра ось-ось почнеться автоматично.']),
         el('div', { class: 'row' }, [
-          el('button', { onclick: () => socket.emit('admin:force_start_game', { roomCode: r.code }, (res) => { if (res.error) toast(res.error, true); }) }, ['Форсувати старт (не чекати на всіх)']),
-          el('button', { class: 'btn-outline crimson', onclick: () => socket.emit('admin:cancel_ready_check', { roomCode: r.code }, (res) => { if (res.error) toast(res.error, true); }) }, ['Скасувати, повернутись у лобі'])
+          el('button', { class: 'btn-small', onclick: () => socket.emit('admin:force_start_game', { roomCode: r.code }, (res) => { if (res.error) toast(res.error, true); }) }, ['Форсувати старт (не чекати на всіх)']),
+          el('button', { class: 'btn-small btn-outline crimson', onclick: () => socket.emit('admin:cancel_ready_check', { roomCode: r.code }, (res) => { if (res.error) toast(res.error, true); }) }, ['Скасувати, повернутись у лобі'])
         ])
       ]));
     }
 
-    box.appendChild(el('div', { class: 'grid-2' }, [
-      el('div', { class: 'stack' }, [renderRosterPanel(r), renderMusicPanel()]),
+    sections.push(el('div', { class: 'grid-2' }, [
+      renderRosterPanel(r),
       renderControlsPanel(r)
     ]));
 
-    if (r.teams.length) box.appendChild(renderTeamScorePanel(r));
+    if (r.teams.length) sections.push(renderTeamScorePanel(r));
 
     if (r.rounds.length) {
-      box.appendChild(el('h3', {}, ['Дошка (раунд ' + (r.currentRoundIndex + 1) + '/' + r.rounds.length + ': ' + (r.rounds[r.currentRoundIndex] || {}).name + ')']));
-      box.appendChild(renderBoardMonitor(r));
-      box.appendChild(renderAnswerKeyPanel(r));
+      sections.push(el('div', { class: 'ds-panel' }, [
+        el('div', { class: 'ds-panel-label' }, ['📊 Дошка (раунд ' + (r.currentRoundIndex + 1) + '/' + r.rounds.length + ': ' + (r.rounds[r.currentRoundIndex] || {}).name + ')']),
+        renderBoardMonitor(r)
+      ]));
+      sections.push(renderAnswerKeyPanel(r));
     }
 
     if (r.activeQuestion) {
@@ -299,16 +370,16 @@
       parts.push(el('div', { style: 'margin-top:10px;' }, [
         el('button', { class: 'btn-crimson', onclick: () => socket.emit('admin:force_resolve_stuck', { roomCode: r.code }, (res) => { if (res.error) toast(res.error, true); }) }, ['Форсувати завершення (зависло)'])
       ]));
-      box.appendChild(el('div', { class: 'clue-panel' }, parts));
+      sections.push(el('div', { class: 'clue-panel' }, parts));
     }
 
     if (lastResolved) {
-      box.appendChild(el('div', { class: 'card', style: 'margin-top:12px;' }, [
-        el('strong', {}, ['Остання відповідь: ' + (lastResolved.timedOut ? 'час вийшов' : (lastResolved.wasCorrect ? 'зараховано правильною' : 'зараховано неправильною'))]),
-        el('div', { style: 'margin:8px 0; color:var(--turquoise-dark);' }, ['Правильна відповідь: ' + lastResolved.correctDisplay]),
+      sections.push(el('div', { class: 'ds-panel' }, [
+        el('div', { class: 'ds-panel-label' }, [lastResolved.timedOut ? 'Остання відповідь: час вийшов' : (lastResolved.wasCorrect ? 'Остання відповідь: зараховано правильною' : 'Остання відповідь: зараховано неправильною')]),
+        el('div', { style: 'margin:8px 0; color:var(--ds-text-dim);' }, ['Правильна відповідь: ' + lastResolved.correctDisplay]),
         el('div', { class: 'row' }, [
-          el('button', { class: 'btn-outline', disabled: lastResolved.wasCorrect ? 'disabled' : null, onclick: () => socket.emit('admin:override_answer', { roomCode: r.code, correct: true }, (res) => { if (res.error) toast(res.error, true); }) }, ['Позначити ПРАВИЛЬНОЮ']),
-          el('button', { class: 'btn-outline crimson', disabled: !lastResolved.wasCorrect ? 'disabled' : null, onclick: () => socket.emit('admin:override_answer', { roomCode: r.code, correct: false }, (res) => { if (res.error) toast(res.error, true); }) }, ['Позначити НЕПРАВИЛЬНОЮ'])
+          el('button', { class: 'btn-small btn-outline', disabled: lastResolved.wasCorrect ? 'disabled' : null, onclick: () => socket.emit('admin:override_answer', { roomCode: r.code, correct: true }, (res) => { if (res.error) toast(res.error, true); }) }, ['Позначити ПРАВИЛЬНОЮ']),
+          el('button', { class: 'btn-small btn-outline crimson', disabled: !lastResolved.wasCorrect ? 'disabled' : null, onclick: () => socket.emit('admin:override_answer', { roomCode: r.code, correct: false }, (res) => { if (res.error) toast(res.error, true); }) }, ['Позначити НЕПРАВИЛЬНОЮ'])
         ])
       ]));
     }
@@ -316,12 +387,12 @@
     // MVP + KKoin summary (dima's spec) -- same room.mvp/kkoinAward fields
     // player.js's renderFinished() reads, just also surfaced to the host.
     if (r.status === 'finished' && r.mvp && r.mvp.nicknames && r.mvp.nicknames.length) {
-      box.appendChild(el('div', { class: 'card', style: 'margin-top:12px; border-color:var(--orange);' }, [
-        el('strong', { style: 'color:var(--orange-dark);' }, ['\u{1F31F} MVP вікторини: ' + r.mvp.nicknames.join(', ') + ' (' + r.mvp.correctCount + ' правильних)'])
+      sections.push(el('div', { class: 'ds-panel', style: 'border-color:var(--orange);' }, [
+        el('strong', { style: 'color:var(--orange);' }, ['\u{1F31F} MVP вікторини: ' + r.mvp.nicknames.join(', ') + ' (' + r.mvp.correctCount + ' правильних)'])
       ]));
     }
     if (r.status === 'finished' && r.kkoinAward && r.kkoinAward.perPlayer > 0) {
-      box.appendChild(el('div', { class: 'kkoin-panel', style: 'margin-top:12px;' }, [
+      sections.push(el('div', { class: 'kkoin-panel' }, [
         el('div', { class: 'kkoin-emoji' }, ['\u{1FA99}']),
         el('div', {}, [
           el('div', { class: 'kkoin-amount' }, ['+' + r.kkoinAward.perPlayer + ' KKrampus coin кожному']),
@@ -330,12 +401,13 @@
       ]));
     }
 
-    box.appendChild(el('div', { class: 'row', style: 'margin-top:16px;' }, [
+    sections.push(el('div', { class: 'row' }, [
       el('button', { class: 'btn-crimson', onclick: () => { if (confirm('Завершити гру достроково?')) socket.emit('admin:end_game', { roomCode: r.code }, () => {}); } }, ['Завершити гру'])
     ]));
 
-    box.appendChild(renderPlayerStatsPanel());
-    return box;
+    sections.push(renderPlayerStatsPanel());
+
+    return el('div', { class: 'stack', style: 'gap:20px; margin-top:22px;' }, sections);
   }
 
   // Host tool: nudge one player's personal bonus counter. Separate from team
@@ -348,7 +420,7 @@
 
   function renderRosterPanel(r) {
     const parts = [
-      el('h3', {}, ['Гравці (' + r.players.length + ')']),
+      el('div', { class: 'ds-panel-label' }, ['👥 Гравці (' + r.players.length + ')']),
       el('div', { class: 'stack roster-list' }, r.players.map(p => {
         const nicknameKey = p.nickname.toLowerCase();
         // Manual team-move (point 5): on top of the balanced snake-draft
@@ -365,7 +437,7 @@
           }, r.teams.map(t => el('option', { value: t.id }, [t.name])));
           moveSelect.value = p.teamId || (r.teams[0] && r.teams[0].id) || '';
         }
-        return el('div', { class: 'stack', style: 'border-bottom:1px solid var(--turquoise-light); padding-bottom:8px; margin-bottom:4px;' }, [
+        return el('div', { class: 'stack', style: 'border-bottom:1px solid var(--ds-border); padding-bottom:8px; margin-bottom:4px;' }, [
           el('div', { class: 'row between' }, [
             el('span', { class: 'roster-row' }, [avatarEl(p, 28), el('span', { class: 'dot ' + (p.connected ? 'on' : 'off') }, []), p.nickname + (p.teamId ? ' — ' + teamName(r, p.teamId) : '')]),
             el('button', { class: 'btn-small btn-outline crimson', onclick: () => { if (confirm('Прибрати ' + p.nickname + '?')) socket.emit('admin:kick_player', { roomCode: r.code, nicknameKey }, () => {}); } }, ['✕'])
@@ -380,7 +452,7 @@
       }))
     ];
     if (r.teams.length) {
-      parts.push(el('h3', { style: 'margin-top:16px;' }, ['Назви команд']));
+      parts.push(el('div', { class: 'ds-panel-label', style: 'margin-top:16px;' }, ['Назви команд']));
       parts.push(el('div', { class: 'stack' }, r.teams.map(t => {
         // Same re-render-resets-draft issue as the numTeams/numRounds fields
         // (see controlsDraft above): seed from any in-flight typed value the
@@ -396,83 +468,12 @@
         ]);
       })));
     }
-    return el('div', {}, parts);
+    return el('div', { class: 'ds-panel' }, parts);
   }
 
   function teamName(r, teamId) {
     const t = r.teams.find(t => t.id === teamId);
     return t ? t.name : '';
-  }
-
-  // ---------------- host music (point 9) ----------------
-  // Plays from the HOST'S OWN speakers for everyone physically in the room --
-  // this is NOT streamed to players over the network/sockets, it's just a
-  // YouTube embed living in the admin's own browser tab. The player <div>
-  // is created ONCE at module load and appended to <body> (never inside
-  // #app), so it survives every render()'s clear(app)+rebuild -- if it lived
-  // inside the normal render tree it would be destroyed and recreated (and
-  // therefore restarted) on every single room:state update during a live game.
-  const ytMusicHost = document.createElement('div');
-  ytMusicHost.id = 'ytMusicPlayer';
-  // position:absolute + tiny size, NOT display:none -- display:none is known
-  // to pause/stop the underlying <iframe> in some browsers, defeating the
-  // whole point of a background music player (see PROGRESS.md item 9).
-  ytMusicHost.style.cssText = 'position:absolute; width:1px; height:1px; visibility:hidden;';
-  document.body.appendChild(ytMusicHost);
-
-  let ytPlayer = null;
-  let ytLoadedVideoId = null; // which video is currently loaded -- lets "Грати" tell "resume this" apart from "load a new track"
-  // extractYouTubeId/ensureYouTubeApi/formatPlayTime/startMusicProgressTicker now live in common.js (shared with player.js)
-  startMusicProgressTicker(() => ytPlayer, 'adminMusicFill', 'adminMusicLabel');
-
-  function playYouTubeUrl(rawUrl) {
-    const id = extractYouTubeId(rawUrl);
-    if (!id) return toast('Не вдалося розпізнати посилання YouTube', true);
-    ensureYouTubeApi(() => {
-      if (!ytPlayer) {
-        ytLoadedVideoId = id;
-        ytPlayer = new YT.Player('ytMusicPlayer', {
-          height: '1', width: '1', videoId: id,
-          playerVars: { autoplay: 1, controls: 0 },
-          // volume applied from the profile page's "гучність музики" setting
-          // (common.js getMusicVolume()) -- see PROGRESS.md 2026-07-21 note.
-          events: { onReady: (e) => { e.target.setVolume(getMusicVolume()); e.target.playVideo(); } }
-        });
-      } else if (id === ytLoadedVideoId) {
-        // Same track still loaded (e.g. hit "Грати" again after "Пауза") --
-        // just resume, do NOT reload, or it would restart from 0:00 instead
-        // of continuing from wherever it was paused (dima's ask).
-        ytPlayer.setVolume(getMusicVolume());
-        ytPlayer.playVideo();
-      } else {
-        ytLoadedVideoId = id;
-        ytPlayer.loadVideoById(id);
-        ytPlayer.setVolume(getMusicVolume());
-        ytPlayer.playVideo();
-      }
-    });
-  }
-  function pauseYouTubeMusic() { if (ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo(); }
-  function stopYouTubeMusic() { if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo(); ytLoadedVideoId = null; }
-
-  function renderMusicPanel() {
-    const urlInput = el('input', {
-      type: 'text', placeholder: 'Посилання на YouTube...', value: musicUrlDraft,
-      oninput: (e) => { musicUrlDraft = e.target.value; }
-    });
-    return el('div', { class: 'card', style: 'margin-top:14px;' }, [
-      el('h3', {}, ['\u{1F3B5} Музика (для ведучого)']),
-      el('div', { class: 'field' }, [urlInput]),
-      el('div', { class: 'row' }, [
-        el('button', { type: 'button', onclick: () => playYouTubeUrl(urlInput.value) }, ['▶ Грати']),
-        el('button', { type: 'button', class: 'btn-outline', onclick: pauseYouTubeMusic }, ['⏸ Пауза']),
-        el('button', { type: 'button', class: 'btn-outline crimson', onclick: stopYouTubeMusic }, ['■ Стоп'])
-      ]),
-      el('div', { class: 'timer-bar', style: 'margin-top:10px;' }, [el('div', { class: 'timer-bar-fill', id: 'adminMusicFill', style: 'background:var(--turquoise);' })]),
-      el('div', { id: 'adminMusicLabel', style: 'font-size:12px; font-weight:700; color:var(--turquoise-dark);' }, ['0:00 / 0:00']),
-      el('p', { style: 'font-size:12px; color:var(--turquoise-dark); margin-top:6px;' },
-        ['Грає з колонок цього комп’ютера (ведучого) для всіх у кімнаті наживо -- не транслюється гравцям через мережу. Пауза зберігає позицію -- «Грати» продовжить з того ж місця.'])
-    ]);
   }
 
   // ---------------- answer key (point 8: see every answer ahead of time) ----------------
@@ -485,14 +486,15 @@
       ...prices.map(price => {
         const q = t.questions.find(q => q.price === price);
         if (!q) return el('td', {}, ['—']);
-        const label = q.display + (q.accepted ? '' : ''); // select-type questions have no `accepted` list, display alone identifies the brand
-        return el('td', { style: q.used ? 'opacity:.55; text-decoration:line-through;' : '' }, [String(price) + ': ' + label]);
+        return el('td', { style: q.used ? 'opacity:.55; text-decoration:line-through;' : '' }, [String(price) + ': ' + q.display]);
       })
     ]));
-    return el('details', { style: 'margin-top:10px;' }, [
-      el('summary', { style: 'cursor:pointer; color:var(--turquoise-dark); font-weight:700;' }, ['\u{1F441}\u{FE0F} Показати всі відповіді цього раунду (заздалегідь)']),
-      el('div', { style: 'overflow-x:auto; margin-top:8px;' }, [
-        el('table', {}, [el('tbody', {}, rows)])
+    return el('div', { class: 'ds-panel' }, [
+      el('details', {}, [
+        el('summary', { style: 'cursor:pointer; color:var(--ds-mint); font-weight:700;' }, ['\u{1F441}\u{FE0F} Показати всі відповіді цього раунду (заздалегідь)']),
+        el('div', { style: 'overflow-x:auto; margin-top:8px;' }, [
+          el('table', {}, [el('tbody', {}, rows)])
+        ])
       ])
     ]);
   }
@@ -511,15 +513,15 @@
       oninput: (e) => { controlsDraft.perRound = e.target.value; }
     });
 
-    const panel = el('div', {}, [
-      el('h3', {}, ['Керування']),
+    const panel = el('div', { class: 'ds-panel' }, [
+      el('div', { class: 'ds-panel-label' }, ['⚙️ Керування']),
       el('div', { class: 'field' }, [
         el('label', {}, ['Кількість команд']),
-        el('div', { class: 'row' }, [numTeamsInput, el('button', { onclick: () => socket.emit('admin:assign_teams', { roomCode: r.code, numTeams: parseInt(numTeamsInput.value, 10) }, (res) => { if (res.error) toast(res.error, true); }) }, ['Сформувати / перебалансувати команди'])])
+        el('div', { class: 'row' }, [numTeamsInput, el('button', { class: 'btn-small', onclick: () => socket.emit('admin:assign_teams', { roomCode: r.code, numTeams: parseInt(numTeamsInput.value, 10) }, (res) => { if (res.error) toast(res.error, true); }) }, ['Сформувати / перебалансувати команди'])])
       ]),
       el('div', { class: 'field' }, [
         el('label', {}, ['Раундів × тем на раунд']),
-        el('div', { class: 'row' }, [numRoundsInput, perRoundInput, el('button', { onclick: () => socket.emit('admin:generate_board', { roomCode: r.code, numRounds: parseInt(numRoundsInput.value, 10), themesPerRound: parseInt(perRoundInput.value, 10) }, (res) => {
+        el('div', { class: 'row' }, [numRoundsInput, perRoundInput, el('button', { class: 'btn-small', onclick: () => socket.emit('admin:generate_board', { roomCode: r.code, numRounds: parseInt(numRoundsInput.value, 10), themesPerRound: parseInt(perRoundInput.value, 10) }, (res) => {
           if (res.error) return toast(res.error, true);
           bankStats = res.bankStats;
           if (res.reusedCount > 0) toast('Банк тем майже вичерпано: ' + res.reusedCount + ' тем взято повторно (найдавніше використані)', true);
@@ -527,14 +529,14 @@
           render();
         }) }, ['Згенерувати теми'])])
       ]),
-      bankStats ? el('p', { style: 'font-size:13px; color:var(--turquoise-dark);' }, ['Банк тем: ' + bankStats.freshRemaining + ' свіжих / ' + bankStats.totalThemes + ' всього']) : null,
+      bankStats ? el('p', { style: 'font-size:13px; color:var(--ds-text-dim);' }, ['Банк тем: ' + bankStats.freshRemaining + ' свіжих / ' + bankStats.totalThemes + ' всього']) : null,
       r.status === 'lobby'
         ? el('div', { class: 'row' }, [
-            el('button', { onclick: () => socket.emit('admin:start_game', { roomCode: r.code }, (res) => { if (res.error) toast(res.error, true); }) }, ['Почати гру'])
+            el('button', { class: 'btn-small', onclick: () => socket.emit('admin:start_game', { roomCode: r.code }, (res) => { if (res.error) toast(res.error, true); }) }, ['Почати гру'])
           ])
-        : el('p', { style: 'font-size:13px; color:var(--turquoise-dark);' }, ['Гру вже розпочато (' + statusLabel(r.status) + ').']),
+        : el('p', { style: 'font-size:13px; color:var(--ds-text-dim);' }, ['Гру вже розпочато (' + statusLabel(r.status) + ').']),
       el('details', { style: 'margin-top:10px;' }, [
-        el('summary', { style: 'cursor:pointer; color:var(--turquoise-dark); font-size:13px;' }, ['Додатково']),
+        el('summary', { style: 'cursor:pointer; color:var(--ds-text-dim); font-size:13px;' }, ['Додатково']),
         el('button', { class: 'btn-small btn-outline', style: 'margin-top:8px;', onclick: () => { if (confirm('Скинути трекер використаних тем? Наступна генерація зможе повторно видати вже бачені теми з цього моменту.')) socket.emit('admin:reset_used_themes', {}, (res) => { bankStats = res.stats; toast('Скинуто'); render(); }); } }, ['Скинути лічильник використаних тем'])
       ])
     ]);
@@ -550,7 +552,7 @@
 
   function renderTeamScorePanel(r) {
     const rows = r.teams.map(t => {
-      return el('div', { class: 'row between', style: 'padding:8px 0; border-bottom:1px solid var(--turquoise-light);' }, [
+      return el('div', { class: 'row between', style: 'padding:8px 0; border-bottom:1px solid var(--ds-border);' }, [
         el('span', { class: 'badge ' + (t.color === 'crimson' || t.color === 'crimson-dark' ? 'crimson' : t.color === 'orange' || t.color === 'orange-dark' ? 'orange' : '') }, [t.name]),
         el('strong', { style: 'font-size:18px;' }, [String(t.score)]),
         el('div', { class: 'team-score-adjust' }, [
@@ -559,8 +561,8 @@
         ])
       ]);
     });
-    return el('div', { class: 'card', style: 'margin-top:14px;' }, [
-      el('h3', {}, ['Рахунок команд (ведучий може коригувати вручну в будь-який момент)']),
+    return el('div', { class: 'ds-panel' }, [
+      el('div', { class: 'ds-panel-label' }, ['🏆 Рахунок команд (ведучий може коригувати вручну в будь-який момент)']),
       el('div', { class: 'stack' }, rows)
     ]);
   }
@@ -584,12 +586,12 @@
 
   function renderPlayerStatsPanel() {
     const sorted = [...playerStats].sort((a, b) => (b.correct - b.incorrect) - (a.correct - a.incorrect));
-    return el('div', { style: 'margin-top:18px;' }, [
+    return el('div', { class: 'ds-panel' }, [
       el('div', { class: 'row between' }, [
-        el('h3', {}, ['Статистика гравців (для розподілу команд)']),
+        el('div', { class: 'ds-panel-label', style: 'margin:0;' }, ['📈 Статистика гравців (для розподілу команд)']),
         el('button', { class: 'btn-small btn-outline', onclick: refreshPlayerStats }, ['Оновити'])
       ]),
-      el('table', {}, [
+      el('table', { style: 'margin-top:10px;' }, [
         el('thead', {}, [el('tr', {}, [el('th', {}, ['Нікнейм']), el('th', {}, ['✓']), el('th', {}, ['✗']), el('th', {}, ['Точність'])])]),
         el('tbody', {}, sorted.map(p => {
           const total = p.correct + p.incorrect;
@@ -600,5 +602,5 @@
     ]);
   }
 
-  if (token) connectSocket(); else render();
+  boot();
 })();

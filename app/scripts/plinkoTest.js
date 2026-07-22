@@ -115,5 +115,39 @@ function assert(cond, msg) {
   assert(allConserved, '300 consecutive real drops all conserve KKoin exactly (balance_after === balance_before - stake + payout), and each returned payout matches games/plinko.js\'s own payout() for its slotIndex');
 })();
 
+// ================= PlinkoManager: dropMany (multi-ball) =================
+(function testDropMany() {
+  console.log('\n--- PlinkoManager.dropMany (multi-ball) ---');
+  const mgr = new PlinkoManager();
+  const nick = 'PlinkoMulti' + Date.now();
+  playersStore.addKkoin(nick, 1000);
+
+  assert(!!mgr.dropMany(nick, 5, 7).error, 'dropMany rejects a ball count outside the 1/5/10/25 allow-list (tried 7)');
+  assert(!!mgr.dropMany(nick, 5, 0).error, 'dropMany rejects a ball count of 0');
+  assert(!!mgr.dropMany('', 5, 5).error, 'dropMany rejects an empty nickname');
+
+  const before = playersStore.getOrCreatePlayer(nick).kkoin;
+  const tooMany = mgr.dropMany(nick, before, 5); // stake*count wildly exceeds balance
+  assert(!!tooMany.error && playersStore.getOrCreatePlayer(nick).kkoin === before, 'dropMany rejects up front (one clear error, balance untouched) when stake*count exceeds the balance -- not a partial batch');
+
+  const balBefore = playersStore.getOrCreatePlayer(nick).kkoin;
+  const res = mgr.dropMany(nick, 3, 25);
+  assert(res.ok && res.count === 25 && Array.isArray(res.results) && res.results.length === 25, 'dropMany(nick, 3, 25) succeeds and returns exactly 25 individual results');
+  assert(res.results.every((r) => r.ok && r.stake === 3), 'every individual result is a real, successful, 3-KKoin single drop (same shape drop() returns on its own)');
+  const sumNet = res.results.reduce((s, r) => s + r.net, 0);
+  assert(res.totalStake === 75 && res.totalNet === sumNet, 'totalStake is exactly 3*25=75, and totalNet matches the sum of each individual result\'s net');
+  const actualBalance = playersStore.getOrCreatePlayer(nick).kkoin;
+  assert(res.balance === actualBalance && actualBalance === balBefore - res.totalStake + res.totalPayout, 'the batch as a whole conserves KKoin exactly, same invariant as a single drop');
+
+  // Each of the 25 results should be independently random (a real
+  // simulatePath() call per ball, not the same outcome copy-pasted 25x) --
+  // over 25 draws from a 17-slot table it would be astronomically unlikely
+  // for every single one to land on the exact same slot by chance.
+  const distinctSlots = new Set(res.results.map((r) => r.slotIndex)).size;
+  assert(distinctSlots > 1, 'the 25 balls landed on more than one distinct slot -- confirms each is an independent simulatePath() call, not one outcome reused 25 times (got ' + distinctSlots + ' distinct slots)');
+
+  assert(mgr.dropMany(nick, 1, 1).ok, 'count=1 is a valid, allowed batch size too (not just 5/10/25)');
+})();
+
 console.log('\n=== ' + passed + '/' + (passed + failed) + ' Plinko assertions passed ===');
 if (failed > 0) process.exit(1);
