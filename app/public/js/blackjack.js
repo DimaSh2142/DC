@@ -145,12 +145,14 @@
 
   function renderControls() {
     if (!view) {
-      // bet screen
+      // bet screen. dima 2026-07-22: "по базі ще хай буде ставка 1, 5, 10" --
+      // fixed round presets (not %-of-balance like before, which produced
+      // ugly numbers depending on the player's exact balance) that deal
+      // instantly on click, PLUS a genuinely independent custom-amount field
+      // (its own "Здати" button, not folded into a shared button whose label
+      // could look stale) so any amount the player types always works.
       const raw = Math.max(0, Math.floor(balance));
-      const presets = [Math.round(raw * 0.05), Math.round(raw * 0.1), Math.round(raw * 0.25)]
-        .map((n) => Math.max(1, n))
-        .filter((n, i, arr) => n <= raw && arr.indexOf(n) === i);
-      const stakeInput = el('input', { type: 'number', min: '1', max: String(raw), placeholder: 'Своя сума', value: customBet, style: 'max-width:120px;', oninput: (e) => { customBet = e.target.value; } });
+      const presets = [1, 5, 10].filter((n) => n <= raw);
       const doDeal = (amount) => {
         const stake = Math.max(1, Math.floor(Number(amount) || 0));
         if (stake > balance) return toast('Недостатньо KKoin для такої ставки', true);
@@ -160,14 +162,23 @@
           refreshBalance(render);
         });
       };
+      const dealCustom = () => {
+        if (!customBet) return toast('Впиши суму ставки', true);
+        doDeal(customBet);
+      };
+      const stakeInput = el('input', {
+        type: 'number', min: '1', max: String(raw), placeholder: 'Своя сума', value: customBet, style: 'max-width:120px;',
+        oninput: (e) => { customBet = e.target.value; },
+        onkeydown: (e) => { if (e.key === 'Enter') dealCustom(); }
+      });
       return el('div', { class: 'bj-bet-block' }, [
         raw < 1 ? el('p', { style: 'text-align:center; color:#C71585;' }, ['Недостатньо KKoin, щоб зробити ставку.']) : null,
         el('div', { class: 'bj-bet-row' }, [
           el('span', { class: 'bj-bet-label' }, ['Ставка:']),
           ...presets.map((p) => el('button', { class: 'btn-small btn-outline bj-bet-preset', onclick: () => doDeal(p) }, [String(p)])),
-          stakeInput
-        ]),
-        el('button', { class: 'bj-deal-btn', disabled: raw < 1 ? 'disabled' : null, onclick: () => doDeal(customBet || presets[0] || 1) }, ['Роздати · ' + (customBet || presets[0] || 1) + ' KKoin'])
+          stakeInput,
+          el('button', { class: 'bj-deal-btn', style: 'padding:10px 20px; font-size:11px;', disabled: raw < 1 ? 'disabled' : null, onclick: dealCustom }, ['Здати'])
+        ])
       ]);
     }
 

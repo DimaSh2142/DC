@@ -53,6 +53,25 @@ function buildAuthRouter() {
   // Ккоїни" -- reuses the same addKkoin() primitive the quiz win-payout and
   // the KKoin earn-menu already use, just gated to admin-role accounts
   // instead of "the player themselves, about themselves".
+  // "Адмін має бачити всіх зареєстрованих гравців списком і просто тиснути
+  // на когось, а не вводити нікнейм вручну" (dima 2026-07-22) -- feeds the
+  // grant-kkoin panel's searchable player list in profile.js. Admin-only,
+  // same guard as grant-kkoin itself; joins the account list with each
+  // player's live kkoin/avatar so the list is actually useful to scan.
+  router.get('/admin/players', authSessions.requireAdmin, (req, res) => {
+    const players = accountsStore.listAccounts().map((account) => {
+      const profile = playersStore.getOrCreatePlayer(account.login);
+      return {
+        login: account.login,
+        role: account.role,
+        avatar: profile.avatar || null,
+        kkoin: profile.kkoin || 0,
+        gamesPlayed: profile.gamesPlayed || 0
+      };
+    });
+    res.json({ players });
+  });
+
   router.post('/grant-kkoin', authSessions.requireAdmin, (req, res) => {
     const { nickname, amount } = req.body || {};
     const trimmed = String(nickname || '').trim();

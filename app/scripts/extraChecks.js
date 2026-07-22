@@ -164,6 +164,21 @@ for (const t of importedThemes) {
 check(mediaRefs > 0, 'imported bank actually references some media files (' + mediaRefs + ')');
 check(mediaMissing === 0, 'every referenced media file exists on disk (' + mediaMissing + ' missing of ' + mediaRefs + ')');
 
+// ---------- 5. accountsStore.listAccounts() never leaks salt/hash (2026-07-22,
+// new admin "browse all players" panel exposes this over HTTP via
+// GET /api/auth/admin/players -- a field-name typo here would be a real
+// credential leak, not just a cosmetic bug) ----------
+const accountsStore = require('../src/state/accountsStore');
+const accountsList = accountsStore.listAccounts();
+check(Array.isArray(accountsList), 'listAccounts() returns an array');
+check(accountsList.length > 0, 'at least the seeded admin account is present (' + accountsList.length + ')');
+const leaked = accountsList.filter((a) => 'salt' in a || 'hash' in a);
+check(leaked.length === 0, 'no account entry exposes salt/hash (' + leaked.length + ' leaking)');
+const allHaveShape = accountsList.every((a) => typeof a.login === 'string' && typeof a.role === 'string');
+check(allHaveShape, 'every entry has exactly the safe {login, role, createdAt} shape');
+const seededAdmin = accountsList.find((a) => a.login.toLowerCase() === 'dimash');
+check(!!seededAdmin && seededAdmin.role === 'admin', 'the seeded DimaSh account is present with role admin');
+
 console.log('');
 console.log(fails === 0 ? 'ALL EXTRA CHECKS PASSED' : (fails + ' EXTRA CHECK(S) FAILED'));
 process.exit(fails ? 1 : 0);

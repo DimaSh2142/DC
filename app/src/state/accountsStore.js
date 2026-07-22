@@ -79,6 +79,19 @@ function getAccount(login) {
 }
 
 /**
+ * All registered accounts, salt/hash stripped (dima 2026-07-22: "адмін має
+ * бачити всіх зареєстрованих на сайті, а не вводити нікнейм вручну" -- lets
+ * the admin KKoin-grant panel render a real, clickable list instead of a
+ * blind text field). Sorted by login so the list is stable/scannable.
+ */
+function listAccounts() {
+  const data = load();
+  return Object.values(data)
+    .map((a) => ({ login: a.login, role: a.role, createdAt: a.createdAt }))
+    .sort((x, y) => x.login.localeCompare(y.login, 'uk'));
+}
+
+/**
  * Registers a brand-new account. Rejects if the login is already taken
  * (case-insensitively, same as a nickname clash elsewhere in this app) --
  * callers should present that as "log in instead".
@@ -123,4 +136,4 @@ function verifyLogin(login, password) {
   return account;
 }
 
-module.exports = { accountExists, getAccount, createAccount, verifyLogin, keyOf };
+module.exports = { accountExists, getAccount, listAccounts, createAccount, verifyLogin, keyOf };

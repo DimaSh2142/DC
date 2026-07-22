@@ -611,7 +611,7 @@ th { color: var(--turquoise-dark); }
 @media (prefers-reduced-motion: reduce) { .hub-sphere { animation: none; } }
 
 /* top bar: styled "Особистий кабінет" button (dima п.5, 2026-07-22: максимально вліво) */
-.hub-topbar { position: relative; z-index: 2; width: 100%; max-width: 900px; display: flex; justify-content: flex-start; margin-bottom: 8px; }
+.hub-topbar { position: relative; z-index: 2; width: 100%; max-width: 900px; display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .hub-cabinet-btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 20px;
@@ -1344,6 +1344,18 @@ input[type="range"] {
 .ds-page .tabs button { background: var(--ds-surface-strong); color: var(--ds-text-dim); border: 1.5px solid var(--ds-border); font-size: 12px; font-weight: 800; letter-spacing: .5px; }
 .ds-page .tabs button.active { background: var(--ds-mint); color: #04140D; border-color: var(--ds-mint); }
 .ds-page .locked-banner { background: rgba(215,38,61,.12); border: 1.5px solid rgba(215,38,61,.4); color: #ff8b98; }
+
+/* ---- admin KKoin-grant panel: searchable/clickable player list (2026-07-22,
+   dima: "адмін має бачити всіх зареєстрованих, а не вводити нікнейм вручну") ---- */
+.admin-player-list { max-height: 230px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; border: 1px solid var(--ds-border); border-radius: 10px; padding: 6px; }
+.admin-player-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; cursor: pointer; border: 1.5px solid transparent; transition: background .12s ease, border-color .12s ease; }
+.admin-player-row:hover { background: var(--ds-surface-strong); }
+.admin-player-row.selected { background: rgba(23,184,166,.14); border-color: var(--turquoise); }
+.admin-player-row-name { flex: 1; font-weight: 700; font-size: 13px; color: var(--ds-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-player-row-role { font-size: 9px; font-weight: 800; letter-spacing: .5px; color: var(--ds-text-dimmer); text-transform: uppercase; border: 1px solid var(--ds-border); border-radius: 5px; padding: 2px 5px; }
+.admin-player-row-kkoin { font-size: 12px; font-weight: 700; color: var(--orange); white-space: nowrap; }
+.admin-player-empty { text-align: center; color: var(--ds-text-dimmer); font-size: 12px; padding: 14px 0; }
+.admin-selected-label { font-size: 12px; font-weight: 700; color: var(--turquoise); margin-bottom: 10px; min-height: 16px; }
 
 /* ============================================================================
    KKrampus coin -- справжня 3D монета-переверталка (2026-07-21, dima дав

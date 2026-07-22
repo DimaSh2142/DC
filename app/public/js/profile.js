@@ -28,9 +28,13 @@
   const logoutBtn = document.getElementById('logout-btn');
   const accountBadge = document.getElementById('account-badge');
   const adminGrantPanel = document.getElementById('admin-grant-panel');
-  const grantNicknameInput = document.getElementById('grant-nickname');
+  const grantSearchInput = document.getElementById('grant-search');
+  const grantPlayerList = document.getElementById('grant-player-list');
+  const grantSelectedLabel = document.getElementById('grant-selected-label');
   const grantAmountInput = document.getElementById('grant-amount');
   const grantKkoinBtn = document.getElementById('grant-kkoin-btn');
+  let adminPlayers = []; // cached GET /api/auth/admin/players result, refetched each time the panel opens
+  let selectedGrantLogin = null;
   const statCorrect = document.getElementById('stat-correct');
   const statIncorrect = document.getElementById('stat-incorrect');
   const statGames = document.getElementById('stat-games');
@@ -141,8 +145,54 @@
 
   function applyAdminPanelVisibility() {
     const auth = getAuth();
-    adminGrantPanel.style.display = (sessionMatchesOpenProfile(auth) && auth.role === 'admin') ? '' : 'none';
+    const shouldShow = sessionMatchesOpenProfile(auth) && auth.role === 'admin';
+    adminGrantPanel.style.display = shouldShow ? '' : 'none';
+    if (shouldShow) loadAdminPlayers(auth);
   }
+
+  // "Адмін має бачити всіх зареєстрованих гравців списком і просто тиснути на
+  // когось, а не вводити нікнейм вручну" (dima 2026-07-22). Fetched fresh
+  // each time the panel becomes visible (e.g. after logging in as admin)
+  // rather than kept live/socket-synced -- this is an occasional admin
+  // action, not a real-time view, same "plain REST, no socket" spirit as the
+  // rest of this page.
+  function loadAdminPlayers(auth) {
+    api('/api/auth/admin/players', { headers: { Authorization: 'Bearer ' + auth.token } }).then(({ status, data }) => {
+      if (status !== 200) return;
+      adminPlayers = (data && data.players) || [];
+      renderGrantPlayerList();
+    }).catch(() => {});
+  }
+
+  function renderGrantPlayerList() {
+    const q = grantSearchInput.value.trim().toLowerCase();
+    const filtered = q ? adminPlayers.filter((p) => p.login.toLowerCase().includes(q)) : adminPlayers;
+    clear(grantPlayerList);
+    if (!filtered.length) {
+      grantPlayerList.appendChild(el('div', { class: 'admin-player-empty' }, [
+        adminPlayers.length ? 'Нікого не знайдено' : 'Ще немає зареєстрованих гравців'
+      ]));
+      return;
+    }
+    filtered.forEach((p) => {
+      const row = el('div', {
+        class: 'admin-player-row' + (p.login === selectedGrantLogin ? ' selected' : ''),
+        onclick: () => {
+          selectedGrantLogin = p.login;
+          grantSelectedLabel.textContent = 'Обрано: ' + p.login;
+          renderGrantPlayerList();
+        }
+      }, [
+        avatarEl({ nickname: p.login, avatar: p.avatar }, 28),
+        el('span', { class: 'admin-player-row-name' }, [p.login]),
+        p.role === 'admin' ? el('span', { class: 'admin-player-row-role' }, ['ADMIN']) : null,
+        el('span', { class: 'admin-player-row-kkoin' }, [String(p.kkoin) + ' KK'])
+      ]);
+      grantPlayerList.appendChild(row);
+    });
+  }
+
+  grantSearchInput.addEventListener('input', renderGrantPlayerList);
 
   function setBackLinkToHome() {
     cabinetBackLink.textContent = '← На головну';
@@ -268,9 +318,9 @@
   grantKkoinBtn.addEventListener('click', () => {
     const auth = getAuth();
     if (!auth || !auth.token) return toast('Спочатку увійди в акаунт адміністратора', true);
-    const targetNickname = grantNicknameInput.value.trim();
+    const targetNickname = selectedGrantLogin;
     const amount = Number(grantAmountInput.value);
-    if (!targetNickname) return toast('Вкажи нікнейм гравця', true);
+    if (!targetNickname) return toast('Обери гравця зі списку', true);
     if (!Number.isFinite(amount) || amount === 0) return toast('Вкажи кількість (не нуль)', true);
     api('/api/auth/grant-kkoin', {
       method: 'POST',
@@ -279,8 +329,12 @@
     }).then(({ status, data }) => {
       if (status !== 200) return toast((data && data.error) || 'Не вдалося видати KKrampus coin', true);
       toast('Видано ' + amount + ' KKrampus coin гравцю ' + targetNickname + ' (баланс: ' + data.profile.kkoin + ')');
-      grantNicknameInput.value = '';
       grantAmountInput.value = '';
+      // Refresh the cached list so the row's shown balance stays accurate if
+      // the admin grants to a few people back-to-back without reopening the panel.
+      const cached = adminPlayers.find((p) => p.login.toLowerCase() === targetNickname.toLowerCase());
+      if (cached) cached.kkoin = data.profile.kkoin;
+      renderGrantPlayerList();
       // Granting to yourself should show up on your own visible balance too.
       if (targetNickname.trim().toLowerCase() === currentNickname.trim().toLowerCase()) {
         profile = data.profile;

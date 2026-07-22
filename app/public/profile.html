@@ -73,8 +73,9 @@
 
             <div class="ds-panel" id="admin-grant-panel" style="display:none;">
               <div class="ds-panel-label">🛡️ Видати KKrampus coin (адмін)</div>
-              <label for="grant-nickname">Нікнейм гравця</label>
-              <input type="text" id="grant-nickname" style="margin-bottom:12px;">
+              <input type="text" id="grant-search" placeholder="Пошук гравця за нікнеймом…" style="margin-bottom:10px;">
+              <div id="grant-player-list" class="admin-player-list"></div>
+              <div id="grant-selected-label" class="admin-selected-label"></div>
               <label for="grant-amount">Кількість</label>
               <input type="number" id="grant-amount" style="margin-bottom:16px;">
               <button type="button" id="grant-kkoin-btn" class="btn-small" style="width:100%;">Видати</button>
