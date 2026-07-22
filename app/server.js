@@ -10,8 +10,10 @@ const { buildProfileRouter } = require('./src/routes/profileRoutes');
 const { buildAuthRouter } = require('./src/routes/authRoutes');
 const { registerSocketHandlers } = require('./src/socket/socketHandlers');
 const { registerMiniGameHandlers } = require('./src/socket/miniGameHandlers');
+const { registerCasinoHandlers } = require('./src/socket/casinoHandlers');
 const { RoomManager } = require('./src/state/roomManager');
 const { MiniGameManager } = require('./src/state/miniGameManager');
+const { BlackjackManager } = require('./src/state/blackjackManager');
 const adminAuth = require('./src/state/adminAuth');
 
 const app = express();
@@ -20,6 +22,7 @@ const io = new Server(server);
 
 const roomManager = new RoomManager();
 const miniGameManager = new MiniGameManager(); // Казино/Міні-ігри "глобальний проект" expansion -- separate from the quiz's RoomManager, see that file's header comment
+const blackjackManager = new BlackjackManager(); // 1-гравець-проти-дилера казино-ігри -- окремо від miniGameManager's 2-людських-гравців кімнат, див. коментар у тому файлі
 
 app.use(express.json({ limit: '25mb' })); // raised from express' 100kb default -- profile avatar uploads are data: URLs, and "Закинь українізовану SiGame" pack uploads are base64-encoded .siq files (can embed images/audio)
 app.use(express.static(path.join(__dirname, 'public')));
@@ -31,6 +34,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISO
 
 registerSocketHandlers(io, { roomManager, adminAuth });
 registerMiniGameHandlers(io, { miniGameManager });
+registerCasinoHandlers(io, { blackjackManager });
 
 // periodic cleanup of long-abandoned rooms so the process doesn't leak
 // memory over a multi-day run

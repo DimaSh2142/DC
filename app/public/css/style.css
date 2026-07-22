@@ -1243,6 +1243,43 @@ input[type="range"] {
 .ds-card--mint .ds-card-icon { background: rgba(61,220,151,.16); color: var(--ds-mint); }
 .ds-card--mint .ds-card-top, .ds-card--mint .ds-card-subtitle, .ds-card--mint .ds-card-arrow { color: var(--ds-mint); }
 
+.ds-card--magenta { border-color: rgba(199,21,133,.35); }
+.ds-card--magenta:hover { border-color: #C71585; box-shadow: 0 18px 40px rgba(199,21,133,.28); }
+.ds-card--magenta .ds-card-icon { background: rgba(199,21,133,.16); color: #C71585; }
+.ds-card--magenta .ds-card-top, .ds-card--magenta .ds-card-subtitle, .ds-card--magenta .ds-card-arrow { color: #C71585; }
+
+.ds-card--gold { border-color: rgba(218,165,32,.35); }
+.ds-card--gold:hover { border-color: #DAA520; box-shadow: 0 18px 40px rgba(218,165,32,.28); }
+.ds-card--gold .ds-card-icon { background: rgba(218,165,32,.16); color: #DAA520; }
+.ds-card--gold .ds-card-top, .ds-card--gold .ds-card-subtitle, .ds-card--gold .ds-card-arrow { color: #DAA520; }
+
+.ds-card--casteal { border-color: rgba(32,178,170,.35); }
+.ds-card--casteal:hover { border-color: #20B2AA; box-shadow: 0 18px 40px rgba(32,178,170,.28); }
+.ds-card--casteal .ds-card-icon { background: rgba(32,178,170,.16); color: #20B2AA; }
+.ds-card--casteal .ds-card-top, .ds-card--casteal .ds-card-subtitle, .ds-card--casteal .ds-card-arrow { color: #20B2AA; }
+
+/* meta stats row (казино картки -- "Макс. виграш" / "RTP", ported from
+   GamePanel.jsx's g.meta array; additive to .ds-card, doesn't touch the
+   minigames.html cards which simply don't include this row) */
+.ds-card-meta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--ds-border); }
+.ds-card-meta-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--ds-text-dimmer); margin: 0; }
+.ds-card-meta-value { font-size: 13px; font-weight: 800; color: var(--ds-text); margin: 2px 0 0; }
+.ds-card--soon { opacity: .82; }
+.ds-card--soon .ds-card-play { color: var(--ds-text-dimmer) !important; }
+
+/* casino hero -- bigger/bolder than the shared .ds-heading (minigames.html
+   etc use a smaller inner-page heading; the reference makes "Казино" a
+   near-homepage-scale hero), exact colors from CasinoHero.jsx */
+.cas-hero-eyebrow { display: flex; align-items: center; gap: 12px; font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #C71585; margin-bottom: 18px; }
+.cas-hero-eyebrow-line { width: 32px; height: 1px; background: #C71585; display: inline-block; }
+.cas-hero-title { font-size: clamp(3rem, 9vw, 7rem); font-weight: 800; letter-spacing: -2px; line-height: .95; color: var(--ds-text); margin: 0 0 18px; }
+.cas-hero-lede { max-width: 460px; font-size: 17px; line-height: 1.6; color: var(--ds-text-dim); margin: 0 0 22px; }
+.cas-hero-badges { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 46px; }
+.cas-hero-badge { display: inline-flex; align-items: center; gap: 8px; border-radius: 99px; padding: 9px 16px; font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+.cas-hero-badge-mint { border: 1px solid rgba(0,255,209,.4); background: rgba(0,255,209,.1); color: #00FFD1; }
+.cas-hero-badge-plain { border: 1px solid var(--ds-border); background: rgba(255,255,255,.03); color: var(--ds-text-dim); }
+.cas-section-eyebrow { color: #00FFD1 !important; }
+
 .ds-note { text-align: center; color: var(--ds-text-dimmer); font-size: 13px; margin: 44px 0 0; }
 
 /* ---- footer (shared across all .ds-page pages, live clock via /js/hub.js) ---- */
@@ -1384,3 +1421,117 @@ body.ds-dark-body .tabs button {
 body.ds-dark-body button.btn-outline.crimson { color: #ff8b98; opacity: 1; }
 body.ds-dark-body button.btn-outline.orange { color: var(--orange); opacity: 1; }
 body.ds-dark-body .room-code { color: #ff5c72; }
+
+/* ==========================================================================
+   Блекджек (dima 2026-07-22, "короче глянеш і все з того архіву достанеш і
+   повставляєш в сайт") -- ported 1:1 from src/pages/Blackjack.jsx +
+   components/blackjack/{PlayingCard,DealerAvatar}.jsx in the base44 export
+   ("6a5fd3917e81c2e03dba4d9a (1).zip"). All hex values below are copied
+   literally from that source, NOT this app's shared --turquoise/--crimson/
+   --orange tokens -- same "new locally-scoped classes, exact reference hex"
+   discipline as the index.html hero/card fixes earlier this session, so
+   nothing shared gets bent to match one page. .bj-page sits alongside
+   .ds-page (inherits its dark gradient background for free, see that rule
+   above) purely to hang page-specific overrides off a second class. ======= */
+.bj-page { text-align: center; }
+.bj-topbar { justify-content: space-between; }
+.bj-coin-chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ds-border); background: rgba(255,255,255,.03); border-radius: 99px; padding: 8px 16px; }
+.bj-coin-icon { font-size: 15px; }
+.bj-coin-value { font-weight: 800; font-size: 14px; color: var(--ds-text); }
+.bj-coin-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--ds-text-dimmer); }
+
+.bj-title-block { text-align: left; margin: 8px 0 24px; }
+.bj-eyebrow { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #C71585; }
+.bj-title { font-size: 34px; font-weight: 800; letter-spacing: -.5px; color: var(--ds-text); margin: 6px 0 0; }
+
+.bj-table {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: linear-gradient(to bottom, #0c1a12, #0a0f0d 55%, #080808);
+  padding: 32px 20px;
+}
+.bj-felt-glow {
+  position: absolute; inset: 0; pointer-events: none; opacity: .35;
+  background: radial-gradient(60% 50% at 50% 30%, rgba(0,255,209,0.10) 0%, transparent 60%);
+}
+.bj-side { position: relative; display: flex; flex-direction: column; align-items: center; }
+.bj-dealer { display: flex; flex-direction: column; align-items: center; }
+.bj-dealer-ring {
+  position: relative; width: 96px; height: 96px; border-radius: 50%;
+  border: 1.5px dashed; display: flex; align-items: center; justify-content: center;
+  transition: border-color .3s ease;
+}
+.bj-dealer-ring.bj-spin { animation: bj-ring-spin 4s linear infinite; }
+@keyframes bj-ring-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.bj-dealer-core {
+  width: 80px; height: 80px; border-radius: 50%; border: 1.5px solid;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(to bottom right, #161616, #0a0a0a);
+  transition: border-color .3s ease, box-shadow .3s ease;
+}
+.bj-dealer-spade { font-size: 34px; line-height: 1; }
+.bj-dealer-status { margin-top: 14px; display: inline-flex; align-items: center; gap: 8px; font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+.bj-dealer-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+.bj-cards-row { margin-top: 20px; display: flex; align-items: flex-end; justify-content: center; gap: 12px; min-height: 160px; flex-wrap: wrap; }
+.bj-card {
+  position: relative; width: 112px; height: 160px; flex-shrink: 0; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.15);
+  background: linear-gradient(to bottom, #161616, #0d0d0d);
+  box-shadow: 0 10px 24px rgba(0,0,0,.5);
+  animation: bj-card-deal .5s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes bj-card-deal { from { opacity: 0; transform: translateY(-40px) rotateY(180deg); } to { opacity: 1; transform: translateY(0) rotateY(0); } }
+.bj-card-corner { position: absolute; display: flex; flex-direction: column; align-items: center; line-height: 1; font-weight: 800; font-size: 16px; }
+.bj-card-corner span { font-size: 13px; }
+.bj-card-corner-tl { top: 8px; left: 8px; }
+.bj-card-corner-br { bottom: 8px; right: 8px; transform: rotate(180deg); }
+.bj-card-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 46px; }
+.bj-card-back {
+  border-color: rgba(199,21,133,.4);
+  background: linear-gradient(to bottom right, rgba(199,21,133,.3), #0a0a0a 55%, rgba(59,130,246,.2));
+  display: flex; align-items: center; justify-content: center;
+}
+.bj-card-back-mark { font-weight: 800; font-size: 26px; letter-spacing: -.5px; color: rgba(199,21,133,.6); }
+
+.bj-divider { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 26px 0; }
+.bj-divider-line { width: 60px; height: 1px; background: rgba(255,255,255,.1); }
+.bj-divider-label { font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: 3px; color: rgba(255,255,255,.3); }
+
+.bj-hand-label { margin-top: 12px; font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--ds-text-dimmer); }
+.bj-hand-value { color: var(--ds-text); }
+
+.bj-result-wrap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 3; }
+.bj-result-banner {
+  border-radius: 14px; border: 1.5px solid; padding: 14px 34px; font-weight: 800; font-size: 24px;
+  letter-spacing: -.5px; background: rgba(8,8,8,.7); backdrop-filter: blur(16px); display: inline-block;
+}
+
+.bj-controls { margin-top: 28px; }
+.bj-bet-block { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.bj-bet-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.bj-bet-label { font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--ds-text-dimmer); }
+.bj-bet-preset { min-width: 56px; }
+.bj-deal-btn, .bj-action-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 12px; padding: 14px 32px; font-family: ui-monospace, monospace;
+  font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+  border: 1.5px solid rgba(0,255,209,.5); background: rgba(0,255,209,.1); color: #00FFD1;
+  cursor: pointer; transition: background .2s ease;
+}
+.bj-deal-btn:hover, .bj-action-hit:hover { background: rgba(0,255,209,.2); }
+.bj-deal-btn:disabled { opacity: .3; cursor: not-allowed; }
+.bj-action-row { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.bj-action-stand { border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.03); color: rgba(255,255,255,.7); }
+.bj-action-stand:hover { border-color: rgba(255,255,255,.3); }
+.bj-waiting-label, .bj-newround-block { text-align: center; font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--ds-text-dimmer); }
+.bj-newround-block { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+@media (max-width: 640px) {
+  .bj-card { width: 84px; height: 120px; }
+  .bj-card-center { font-size: 32px; }
+  .bj-dealer-ring { width: 76px; height: 76px; }
+  .bj-dealer-core { width: 64px; height: 64px; }
+}
