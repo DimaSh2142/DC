@@ -66,6 +66,17 @@ function mgRenderJoinScreen(socket, app, opts) {
         opts.onJoined({ roomCode: res.room.code, playerIdx: res.playerIdx, room: res.room });
       });
     }
+    // dima 2026-07-22 "зроби щоб у хрестики нулики можна було грати з ШІ" --
+    // opts.vsAI (currently only set by tictactoe.js) adds this third path
+    // alongside create/join. Skips the stake entirely (see
+    // miniGameManager.createAIRoom -- playing a bot for KKoin is meaningless).
+    function doPlayAI() {
+      socket.emit('mg:create_ai_room', { gameType: opts.gameType, nickname }, (res) => {
+        if (res.error) return toast(res.error, true);
+        localStorage.setItem(mgRoomStorageKey(opts.gameType), res.room.code);
+        opts.onJoined({ roomCode: res.room.code, playerIdx: res.playerIdx, room: res.room });
+      });
+    }
 
     // dima 2026-07-22: uploaded a base44 "GameLobby.jsx" reference and asked
     // this join/create screen to match the mini-games hub's own polish level
@@ -87,6 +98,7 @@ function mgRenderJoinScreen(socket, app, opts) {
         el('div', { class: 'mg-lobby-field-label' }, [el('span', {}, ['Ставка (KKoin), необов’язково']), balanceLabel]),
         stakeInput,
         el('button', { class: 'mg-lobby-cta', onclick: doCreate }, ['✨ Створити нову гру']),
+        opts.vsAI ? el('button', { class: 'btn-small btn-outline', style: 'width:100%; margin-top:8px;', onclick: doPlayAI }, ['🤖 Грати проти ШІ']) : null,
         el('div', { class: 'mg-lobby-divider' }, [el('span', {}), el('em', {}, ['або']), el('span', {})]),
         el('label', { class: 'mg-lobby-field-label' }, [el('span', {}, ['Приєднатись за кодом'])]),
         el('div', { class: 'mg-lobby-join-row' }, [

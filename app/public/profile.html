@@ -185,6 +185,16 @@
               <input type="number" id="grant-amount" style="margin-bottom:16px;">
               <button type="button" id="grant-kkoin-btn" class="btn-small" style="width:100%;">Видати</button>
             </div>
+
+            <!-- "адмін з кабінету зміг переглядати від всіх гравців скарги та
+                 пропозиції до проекту" (dima 2026-07-22) -- same display:none
+                 admin-only gating pattern as admin-grant-panel above, toggled
+                 by the same applyAdminPanelVisibility() in profile.js. -->
+            <div class="ds-panel" id="admin-reports-panel" style="display:none;">
+              <div class="ds-panel-label">🛡️ Скарги та пропозиції (адмін)</div>
+              <div id="admin-reports-empty" class="report-empty" style="display:none;">Поки що немає звернень.</div>
+              <div id="admin-reports-list" class="report-list"></div>
+            </div>
           </div>
 
           <div class="ds-col">
@@ -216,15 +226,25 @@
 
             <div class="ds-panel">
               <div class="ds-panel-label">Налаштування</div>
-              <label>Тема сайту</label>
-              <div class="tabs" id="theme-tabs" style="margin-bottom:20px;">
-                <button type="button" data-theme="light">☀️ Світла</button>
-                <button type="button" data-theme="dark">🌙 Темна</button>
-              </div>
               <label for="music-volume">Гучність музики (<span id="music-volume-value">80</span>%)</label>
               <input type="range" id="music-volume" min="0" max="100" step="1" style="margin-bottom:20px;">
               <label for="mic-volume">Гучність мікрофону інших учасників (<span id="mic-volume-value">100</span>%)</label>
               <input type="range" id="mic-volume" min="0" max="100" step="1">
+            </div>
+
+            <!-- "гравець зможе в особистому кабінеті закинути якусь ідею або
+                 скаргу" (dima 2026-07-22) -- visible to any logged-in player,
+                 no admin gate (see reportsStore.js header: submitting is
+                 trust-based like the rest of this app, only VIEWING the full
+                 list is admin-only). -->
+            <div class="ds-panel">
+              <div class="ds-panel-label">💬 Ідея чи скарга</div>
+              <div class="tabs" id="report-type-tabs">
+                <button type="button" class="active" data-value="idea">💡 Ідея</button>
+                <button type="button" data-value="complaint">⚠️ Скарга</button>
+              </div>
+              <textarea id="report-message" maxlength="1000" placeholder="Напиши свою ідею чи скаргу розробнику..." style="margin-bottom:12px;"></textarea>
+              <button type="button" id="report-submit-btn" class="btn-small" style="width:100%;">Надіслати</button>
             </div>
           </div>
         </div>

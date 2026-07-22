@@ -71,4 +71,8 @@ function getPublicView(state) {
   };
 }
 
-module.exports = { SIZE, LINES, createInitialState, getLegalMoves, applyMove, getPublicView };
+// checkWinner is also exported for tictactoeBot.js (2026-07-22 "грати з ШІ"
+// feature) -- reusing this exact function instead of a second copy means
+// the bot's minimax search and the server's own win detection can never
+// disagree about what counts as a win.
+module.exports = { SIZE, LINES, createInitialState, getLegalMoves, applyMove, getPublicView, checkWinner };

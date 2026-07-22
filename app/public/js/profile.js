@@ -35,6 +35,15 @@
   const grantKkoinBtn = document.getElementById('grant-kkoin-btn');
   let adminPlayers = []; // cached GET /api/auth/admin/players result, refetched each time the panel opens
   let selectedGrantLogin = null;
+  // "система репортів" (2026-07-22)
+  const adminReportsPanel = document.getElementById('admin-reports-panel');
+  const adminReportsEmpty = document.getElementById('admin-reports-empty');
+  const adminReportsList = document.getElementById('admin-reports-list');
+  let adminReports = []; // cached GET /api/auth/admin/reports result, refetched each time the panel opens
+  const reportTypeTabs = document.getElementById('report-type-tabs');
+  const reportMessageInput = document.getElementById('report-message');
+  const reportSubmitBtn = document.getElementById('report-submit-btn');
+  let selectedReportType = 'idea';
   const statCorrect = document.getElementById('stat-correct');
   const statIncorrect = document.getElementById('stat-incorrect');
   const statGames = document.getElementById('stat-games');
@@ -42,7 +51,6 @@
   const kkoinAddBtn = document.getElementById('kkoin-add-btn');
   const itemsEmpty = document.getElementById('items-empty');
   const itemsList = document.getElementById('items-list');
-  const themeTabs = document.getElementById('theme-tabs');
   const musicVolumeEl = document.getElementById('music-volume');
   const musicVolumeValue = document.getElementById('music-volume-value');
   const micVolumeEl = document.getElementById('mic-volume');
@@ -284,6 +292,8 @@
     const shouldShow = sessionMatchesOpenProfile(auth) && auth.role === 'admin';
     adminGrantPanel.style.display = shouldShow ? '' : 'none';
     if (shouldShow) loadAdminPlayers(auth);
+    adminReportsPanel.style.display = shouldShow ? '' : 'none';
+    if (shouldShow) loadAdminReports(auth);
   }
 
   // "Адмін має бачити всіх зареєстрованих гравців списком і просто тиснути на
@@ -292,9 +302,37 @@
   // rather than kept live/socket-synced -- this is an occasional admin
   // action, not a real-time view, same "plain REST, no socket" spirit as the
   // rest of this page.
+  // dima 2026-07-22 "якось погано працює система, я зареєстрований але
+  // всерівно не можу видати коіни". Root cause: authSessions.js is
+  // deliberately in-memory only (dies on every server restart/Render
+  // cold-start -- see its own header comment), but getAuth()'s cached
+  // {token, role} in localStorage never expires on its own. So after any
+  // restart the admin panel keeps SHOWING (applyAdminPanelVisibility only
+  // trusts the stale cached role, never re-checks the server) while every
+  // real admin call silently 403s underneath it -- which used to just look
+  // like "Ще немає зареєстрованих гравців" with a dead grant button, no
+  // indication anything was actually wrong.
+  //
+  // Fix: on any failed admin call, re-check /api/auth/me (which cleanly
+  // 401s a dead token via requireSession) to tell "session expired" apart
+  // from "genuinely not admin" -- requireAdmin's own 403 can't tell those
+  // apart on its own, both look identical from the caller's side. If /me
+  // also fails, the session really is dead: clear the stale localStorage
+  // auth and re-render so the badge/panel honestly flip back to "not logged
+  // in" instead of staying stuck looking broken.
+  function handleAdminAuthFailure(auth) {
+    api('/api/auth/me', { headers: { Authorization: 'Bearer ' + (auth && auth.token) } }).then(({ status }) => {
+      if (status === 200) return; // token's still valid -- the role check itself failed server-side, nothing to self-heal
+      clearAuth();
+      toast('Сесія адміністратора застаріла (сервер перезапускався) — увійди ще раз', true);
+      renderAccountBadge();
+      applyAdminPanelVisibility();
+    }).catch(() => {});
+  }
+
   function loadAdminPlayers(auth) {
     api('/api/auth/admin/players', { headers: { Authorization: 'Bearer ' + auth.token } }).then(({ status, data }) => {
-      if (status !== 200) return;
+      if (status !== 200) return handleAdminAuthFailure(auth);
       adminPlayers = (data && data.players) || [];
       renderGrantPlayerList();
     }).catch(() => {});
@@ -329,6 +367,52 @@
   }
 
   grantSearchInput.addEventListener('input', renderGrantPlayerList);
+
+  // "адмін з кабінету зміг переглядати від всіх гравців скарги та пропозиції"
+  // (dima 2026-07-22) -- same fetch-fresh-on-panel-open + self-healing-on-401
+  // pattern as loadAdminPlayers/handleAdminAuthFailure just above, reused
+  // as-is: that function's actual behavior (tell "dead session" apart from
+  // "not admin" via /api/auth/me, clear+re-render if dead) applies just as
+  // well to this call as to the grant-kkoin one, no admin-specific logic to
+  // duplicate.
+  function loadAdminReports(auth) {
+    api('/api/auth/admin/reports', { headers: { Authorization: 'Bearer ' + auth.token } }).then(({ status, data }) => {
+      if (status !== 200) return handleAdminAuthFailure(auth);
+      adminReports = (data && data.reports) || [];
+      renderAdminReportsList();
+    }).catch(() => {});
+  }
+
+  function renderAdminReportsList() {
+    adminReportsEmpty.style.display = adminReports.length ? 'none' : '';
+    clear(adminReportsList);
+    adminReports.forEach((r) => {
+      const card = el('div', { class: 'report-card' + (r.resolved ? ' resolved' : '') }, [
+        el('div', { class: 'report-card-top' }, [
+          el('span', { class: 'report-card-nick' }, [(r.type === 'idea' ? '💡 ' : '⚠️ ') + r.nickname]),
+          el('span', { class: 'report-card-meta' }, [formatRelativeTime(r.createdAt)])
+        ]),
+        el('div', { class: 'report-card-msg' }, [r.message]),
+        el('button', {
+          type: 'button', class: 'btn-small btn-outline',
+          onclick: () => {
+            const auth = getAuth();
+            if (!auth || !auth.token) return;
+            api('/api/auth/admin/reports/' + encodeURIComponent(r.id), {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth.token },
+              body: JSON.stringify({ resolved: !r.resolved })
+            }).then(({ status, data }) => {
+              if (status !== 200) return handleAdminAuthFailure(auth);
+              r.resolved = data.report.resolved;
+              renderAdminReportsList();
+            }).catch(() => toast('Не вдалося з’єднатися із сервером', true));
+          }
+        }, [r.resolved ? 'Повернути в чергу' : 'Позначити переглянутим'])
+      ]);
+      adminReportsList.appendChild(card);
+    });
+  }
 
   function setBackLinkToHome() {
     cabinetBackLink.textContent = '← На головну';
@@ -435,7 +519,10 @@
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth.token },
       body: JSON.stringify({ nickname: targetNickname, amount })
     }).then(({ status, data }) => {
-      if (status !== 200) return toast((data && data.error) || 'Не вдалося видати KKrampus coin', true);
+      if (status !== 200) {
+        handleAdminAuthFailure(auth);
+        return toast((data && data.error) || 'Не вдалося видати KKrampus coin', true);
+      }
       toast('Видано ' + amount + ' KKrampus coin гравцю ' + targetNickname + ' (баланс: ' + data.profile.kkoin + ')');
       grantAmountInput.value = '';
       // Refresh the cached list so the row's shown balance stays accurate if
@@ -449,6 +536,38 @@
         renderProfile();
       }
     }).catch(() => toast('Не вдалося з’єднатися із сервером', true));
+  });
+
+  // "гравець зможе в особистому кабінеті закинути якусь ідею або скаргу"
+  // (dima 2026-07-22). The type toggle reuses the plain .tabs button(.active)
+  // pattern (see style.css) -- just two buttons, no framework needed to keep
+  // exactly one of them marked active.
+  reportTypeTabs.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      selectedReportType = btn.dataset.value;
+      reportTypeTabs.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  reportSubmitBtn.addEventListener('click', () => {
+    const auth = getAuth();
+    if (!auth || !auth.token) return toast('Спочатку увійди в акаунт', true);
+    const message = reportMessageInput.value.trim();
+    if (!message) return toast('Напиши текст повідомлення', true);
+    reportSubmitBtn.disabled = true;
+    api('/api/auth/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth.token },
+      body: JSON.stringify({ type: selectedReportType, message })
+    }).then(({ status, data }) => {
+      reportSubmitBtn.disabled = false;
+      if (status !== 200) {
+        handleAdminAuthFailure(auth);
+        return toast((data && data.error) || 'Не вдалося надіслати', true);
+      }
+      reportMessageInput.value = '';
+      toast(selectedReportType === 'idea' ? 'Дякуємо за ідею!' : 'Дякуємо, скаргу передано адміну!');
+    }).catch(() => { reportSubmitBtn.disabled = false; toast('Не вдалося з’єднатися із сервером', true); });
   });
 
   avatarPicker.addEventListener('click', () => { if (!locked) avatarFileInput.click(); });
@@ -632,19 +751,9 @@
   }
 
   // ---- settings (pure client-side localStorage prefs, see common.js) ----
-  function renderThemeTabs() {
-    const current = getTheme();
-    Array.from(themeTabs.children).forEach((btn) => {
-      btn.classList.toggle('active', btn.getAttribute('data-theme') === current);
-    });
-  }
-  themeTabs.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-theme]');
-    if (!btn) return;
-    setTheme(btn.getAttribute('data-theme'));
-    renderThemeTabs();
-  });
-
+  // (theme toggle removed 2026-07-22, dima: "забери взагалі це налаштування
+  // теми, сайт д завжди темним буде" -- see common.js, dark is now forced
+  // unconditionally, no per-user setting left to render/wire up here.)
   musicVolumeEl.addEventListener('input', () => {
     musicVolumeValue.textContent = musicVolumeEl.value;
     setMusicVolume(musicVolumeEl.value);
@@ -655,7 +764,6 @@
   });
 
   function initSettingsControls() {
-    renderThemeTabs();
     musicVolumeEl.value = getMusicVolume();
     musicVolumeValue.textContent = musicVolumeEl.value;
     micVolumeEl.value = getMicVolume();

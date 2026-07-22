@@ -13,6 +13,11 @@ const { makeFakeIo } = require('./fakeSocketHarness');
 const { registerMiniGameHandlers } = require('../src/socket/miniGameHandlers');
 const { MiniGameManager } = require('../src/state/miniGameManager');
 const playersStore = require('../src/state/playersStore');
+const activityStore = require('../src/state/activityStore');
+const tictactoeBot = require('../src/games/tictactoeBot');
+const config = require('../src/config');
+
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
 let passed = 0, failed = 0;
 function assert(cond, msg) {
@@ -176,27 +181,34 @@ async function run() {
   assert(r1StateAfterRematch.myPlayerIdx === 1 && r2StateAfterRematch.myPlayerIdx === 0, 'rematch swaps seats (playerIdx 0<->1) so the loser of the previous game does not always keep the same side/first-move advantage');
 
   // ================= KKoin stakes (dima 2026-07-22 "якщо я хочу зіграти на гроші (KKoins) чому я ніде не можу це поставити") =================
-  playersStore.addKkoin('StakeRich', 100);
-  playersStore.addKkoin('StakePoor', 5);
+  // Unique nickname per run (2026-07-22 fix) -- these assertions check EXACT
+  // balances, and a literal 'StakeRich'/'StakePoor' accumulates real KKoin
+  // in the actual persisted data/players.json across repeated test runs,
+  // eventually breaking the exact-equality checks below. Same fix already
+  // applied to plinkoTest.js/rouletteTest.js this session.
+  const richNick = 'StakeRich' + Date.now();
+  const poorNick = 'StakePoor' + Date.now();
+  playersStore.addKkoin(richNick, 100);
+  playersStore.addKkoin(poorNick, 5);
   const s1 = newConnection('stakeRich');
   const s2 = newConnection('stakePoor');
 
-  const createTooRich = await s1.trigger('mg:create_room', { gameType: 'checkers', nickname: 'StakeRich', stake: 1000 });
+  const createTooRich = await s1.trigger('mg:create_room', { gameType: 'checkers', nickname: richNick, stake: 1000 });
   assert(!!createTooRich.error, 'mg:create_room rejects a stake bigger than the creator can currently afford');
 
-  const stakeCreate = await s1.trigger('mg:create_room', { gameType: 'checkers', nickname: 'StakeRich', stake: 30 });
+  const stakeCreate = await s1.trigger('mg:create_room', { gameType: 'checkers', nickname: richNick, stake: 30 });
   assert(stakeCreate.ok && stakeCreate.room.stake === 30, 'mg:create_room accepts an affordable stake and echoes it back in the room state');
   const stakeCode = stakeCreate.room.code;
-  assert(playersStore.getOrCreatePlayer('StakeRich').kkoin === 100, 'creating a staked room does NOT deduct anything yet -- only one seat is filled so far');
+  assert(playersStore.getOrCreatePlayer(richNick).kkoin === 100, 'creating a staked room does NOT deduct anything yet -- only one seat is filled so far');
 
-  const joinTooPoor = await s2.trigger('mg:join_room', { gameType: 'checkers', roomCode: stakeCode, nickname: 'StakePoor' });
+  const joinTooPoor = await s2.trigger('mg:join_room', { gameType: 'checkers', roomCode: stakeCode, nickname: poorNick });
   assert(!!joinTooPoor.error, "mg:join_room rejects a joiner who can't afford the room's stake");
-  assert(playersStore.getOrCreatePlayer('StakePoor').kkoin === 5, "a rejected join never touches the joiner's balance");
+  assert(playersStore.getOrCreatePlayer(poorNick).kkoin === 5, "a rejected join never touches the joiner's balance");
 
-  playersStore.addKkoin('StakePoor', 50); // top up to 55, now affordable (>= 30)
-  const joinAffordable = await s2.trigger('mg:join_room', { gameType: 'checkers', roomCode: stakeCode, nickname: 'StakePoor' });
+  playersStore.addKkoin(poorNick, 50); // top up to 55, now affordable (>= 30)
+  const joinAffordable = await s2.trigger('mg:join_room', { gameType: 'checkers', roomCode: stakeCode, nickname: poorNick });
   assert(joinAffordable.ok, "mg:join_room accepts the same joiner once their balance covers the stake");
-  assert(playersStore.getOrCreatePlayer('StakeRich').kkoin === 70 && playersStore.getOrCreatePlayer('StakePoor').kkoin === 25,
+  assert(playersStore.getOrCreatePlayer(richNick).kkoin === 70 && playersStore.getOrCreatePlayer(poorNick).kkoin === 25,
     'the moment the room actually starts (2nd seat filled), BOTH stakes are deducted in one shot (100-30=70, 55-30=25)');
 
   const stakeMove = await s1.trigger('mg:checkers_move', { from: [2, 1], to: [3, 0] });
@@ -204,17 +216,17 @@ async function run() {
 
   const stakeResign = await s2.trigger('mg:resign', {});
   assert(stakeResign.ok, 'resigning a staked game is still accepted');
-  assert(playersStore.getOrCreatePlayer('StakeRich').kkoin === 130, 'the winner (StakeRich, since StakePoor resigned) is paid the full pot the instant the room finishes (70+60=130)');
-  assert(playersStore.getOrCreatePlayer('StakePoor').kkoin === 25, "the loser's balance doesn't change again at resign time -- their stake was already spent when the room started");
+  assert(playersStore.getOrCreatePlayer(richNick).kkoin === 130, 'the winner (StakeRich, since StakePoor resigned) is paid the full pot the instant the room finishes (70+60=130)');
+  assert(playersStore.getOrCreatePlayer(poorNick).kkoin === 25, "the loser's balance doesn't change again at resign time -- their stake was already spent when the room started");
 
   const rematchTooPoor = await s1.trigger('mg:rematch', {});
   assert(!!rematchTooPoor.error, 'mg:rematch on a staked room is rejected when a player can no longer afford the SAME stake (StakePoor has 25, needs 30)');
-  assert(playersStore.getOrCreatePlayer('StakeRich').kkoin === 130 && playersStore.getOrCreatePlayer('StakePoor').kkoin === 25, 'a rejected rematch leaves both balances untouched');
+  assert(playersStore.getOrCreatePlayer(richNick).kkoin === 130 && playersStore.getOrCreatePlayer(poorNick).kkoin === 25, 'a rejected rematch leaves both balances untouched');
 
-  playersStore.addKkoin('StakePoor', 10); // top up to 35, affordable again
+  playersStore.addKkoin(poorNick, 10); // top up to 35, affordable again
   const rematchAffordable = await s1.trigger('mg:rematch', {});
   assert(rematchAffordable.ok, 'mg:rematch succeeds once both players can once again afford the room\'s stake');
-  assert(playersStore.getOrCreatePlayer('StakeRich').kkoin === 100 && playersStore.getOrCreatePlayer('StakePoor').kkoin === 5,
+  assert(playersStore.getOrCreatePlayer(richNick).kkoin === 100 && playersStore.getOrCreatePlayer(poorNick).kkoin === 5,
     'a successful rematch re-deducts the SAME stake from both players all over again (130-30=100, 35-30=5)');
   const stakeStateAfterRematch = s1.lastReceived('mg:room_state');
   assert(stakeStateAfterRematch.stake === 30, "the room's stake amount is unchanged by a rematch (still 30), only the seats/game state reset");
@@ -251,6 +263,102 @@ async function run() {
   assert(reconnectRes.ok && reconnectRes.playerIdx === 0, 'reconnecting with the same nickname re-attaches to the same seat (playerIdx 0), not a new one');
   const d2StateAfterReconnect = d2.lastReceived('mg:room_state');
   assert(d2StateAfterReconnect.players[0].connected === true, "the reconnect is reflected back to the OTHER player's broadcast state too");
+
+  // ================= disconnect -> auto-forfeit (dima 2026-07-22 "коли один
+  // гравець виходить з лобі - другому автоматом зараховували перемогу в
+  // любій грі") ================= temporarily shrink the grace period so
+  // the test doesn't actually wait 45 real seconds -- restored in a
+  // finally-equivalent right after, so no other test in this file is
+  // affected by the shortened window.
+  const realForfeitMs = config.MINIGAME_DISCONNECT_FORFEIT_MS;
+  config.MINIGAME_DISCONNECT_FORFEIT_MS = 30;
+  try {
+    // ---- scenario 1: disconnect and NEVER come back -> opponent auto-wins ----
+    const f1 = newConnection('forfeitA');
+    const f2 = newConnection('forfeitB');
+    const fCreate = await f1.trigger('mg:create_room', { gameType: 'checkers', nickname: 'ForfeitA' });
+    const fCode = fCreate.room.code;
+    await f2.trigger('mg:join_room', { gameType: 'checkers', roomCode: fCode, nickname: 'ForfeitB' });
+    f2.disconnectNow();
+    const roomRightAfterDisconnect = miniGameManager.getRoom(fCode);
+    assert(roomRightAfterDisconnect.status === 'playing', 'a disconnect does NOT instantly forfeit the game -- the grace period must elapse first (mgTryReconnect gets a real chance)');
+    await sleep(80); // > the 30ms shortened grace period
+    const roomAfterGrace = miniGameManager.getRoom(fCode);
+    assert(roomAfterGrace.status === 'finished' && roomAfterGrace.resignedIdx === 1, 'once the grace period elapses with no reconnect, the disconnected player (idx 1) is auto-forfeited, same as an explicit resign');
+    assert(roomAfterGrace.gameState.winnerIdx === 0, 'the still-connected player (idx 0) is credited the win automatically');
+    const f1FinalState = f1.lastReceived('mg:room_state');
+    assert(f1FinalState.status === 'finished', "the remaining player's socket is actively pushed the finished state, not left waiting");
+
+    // ---- scenario 2: disconnect, but reconnect BEFORE the grace period ends -> no forfeit ----
+    const g1 = newConnection('forfeitC');
+    const g2 = newConnection('forfeitD');
+    const gCreate = await g1.trigger('mg:create_room', { gameType: 'checkers', nickname: 'ForfeitC' });
+    const gCode = gCreate.room.code;
+    await g2.trigger('mg:join_room', { gameType: 'checkers', roomCode: gCode, nickname: 'ForfeitD' });
+    g2.disconnectNow();
+    const g2New = newConnection('forfeitD-reconnected');
+    await g2New.trigger('mg:reconnect', { gameType: 'checkers', roomCode: gCode, nickname: 'ForfeitD' });
+    await sleep(80); // well past the 30ms window the FIRST disconnect started
+    const roomAfterReconnect = miniGameManager.getRoom(gCode);
+    assert(roomAfterReconnect.status === 'playing', 'reconnecting before the grace period elapses cancels the pending auto-forfeit -- the game is still on');
+  } finally {
+    config.MINIGAME_DISCONNECT_FORFEIT_MS = realForfeitMs;
+  }
+
+  // ================= tic-tac-toe vs AI (dima 2026-07-22 "зроби щоб у
+  // хрестики нулики можна було грати з ШІ") =================
+  const rejectedAI = await newConnection('aiRejectType').trigger('mg:create_ai_room', { gameType: 'checkers', nickname: 'NoAICheckers' });
+  assert(!!rejectedAI.error, 'mg:create_ai_room refuses any gameType other than tictactoe (checkers/chess bots do not exist)');
+
+  const aiNick = 'AIPlayer' + Date.now();
+  const h = newConnection('aiHuman');
+  const aiCreate = await h.trigger('mg:create_ai_room', { gameType: 'tictactoe', nickname: aiNick });
+  assert(aiCreate.ok && aiCreate.room.status === 'playing' && aiCreate.playerIdx === 0, 'mg:create_ai_room starts "playing" immediately, no waiting-for-opponent step, human seated at playerIdx 0');
+  assert(aiCreate.room.players.length === 2 && aiCreate.room.players[1].nickname === 'ШІ 🤖', 'the second seat is filled by a synthetic bot player right away');
+  const aiCode = aiCreate.room.code;
+
+  // Force the bot into pure-optimal mode for this test (see MISTAKE_CHANCE
+  // in tictactoeBot.js) -- Math.random is one global function shared by
+  // every required module in this process, so patching it here really does
+  // reach the server-side bot code, not just this test file's own calls.
+  const origRandom = Math.random;
+  Math.random = () => 0.99;
+  try {
+    const firstMove = await h.trigger('mg:tictactoe_move', { index: 0 });
+    assert(firstMove.ok, "the human's opening move is accepted");
+    const rightAfterMove = h.lastReceived('mg:room_state');
+    assert(rightAfterMove.gameState.board.filter(c => c !== null).length === 1, "the bot's reply is NOT instant -- reads as one human move having landed, not two");
+
+    await sleep(650); // > the 550ms "thinking" delay before the bot replies
+    const afterBotReply = h.lastReceived('mg:room_state');
+    assert(afterBotReply.gameState.board.filter(c => c !== null).length === 2, "the bot automatically replies a beat later, without the human doing anything else");
+    assert(afterBotReply.gameState.turn === 0, "it's the human's turn again once the bot has moved");
+
+    // Play the human out optimally too (reusing the exact same bot logic
+    // "as if" the human were also playing perfectly) -- two optimal
+    // tic-tac-toe players always draw, so this deterministically drives the
+    // match to a real finish without hardcoding a move-by-move script by hand.
+    let guardTurns = 0;
+    while (afterBotReply.gameState.winnerIdx === null && !afterBotReply.gameState.drawReason && guardTurns < 9) {
+      const board = afterBotReply.gameState.board;
+      const humanMove = tictactoeBot.pickMove(board.slice(), 0, 1);
+      const res = await h.trigger('mg:tictactoe_move', { index: humanMove });
+      if (res.error) { assert(false, 'unexpected error while playing out the optimal draw: ' + res.error); break; }
+      const stateNow = h.lastReceived('mg:room_state');
+      if (stateNow.gameState.winnerIdx === null && !stateNow.gameState.drawReason && stateNow.gameState.turn === 1) {
+        await sleep(650);
+      }
+      Object.assign(afterBotReply, { gameState: h.lastReceived('mg:room_state').gameState });
+      guardTurns++;
+    }
+    const finalRoom = miniGameManager.getRoom(aiCode);
+    assert(finalRoom.status === 'finished' && finalRoom.gameState.winnerIdx === null && !!finalRoom.gameState.drawReason,
+      'two optimally-played sides (human driven by the same minimax the bot uses) reach a real draw, same as tic-tac-toe theory predicts');
+
+    assert(activityStore.getRecentActivity(aiNick, 5).some(e => e.detail.indexOf('Нічия') !== -1), "the HUMAN's own activity feed gets a real entry for the vs-AI draw");
+  } finally {
+    Math.random = origRandom;
+  }
 
   console.log('\n=== ' + passed + '/' + (passed + failed) + ' mini-game SOCKET assertions passed ===');
   if (failed > 0) process.exit(1);

@@ -13,6 +13,7 @@ const express = require('express');
 const accountsStore = require('../state/accountsStore');
 const authSessions = require('../state/authSessions');
 const playersStore = require('../state/playersStore');
+const reportsStore = require('../state/reportsStore');
 
 function buildAuthRouter() {
   const router = express.Router();
@@ -80,6 +81,35 @@ function buildAuthRouter() {
     if (!Number.isFinite(n) || n === 0) return res.status(400).json({ error: 'Вкажіть ненульову кількість KKrampus coin' });
     const profile = playersStore.addKkoin(trimmed, n);
     res.json({ ok: true, profile });
+  });
+
+  // "Система репортів" (2026-07-22, dima: "гравець зможе в особистому
+  // кабінеті закинути якусь ідею або скаргу, а адмін з кабінету зміг
+  // переглядати від всіх гравців скарги та пропозиції"). Submitting requires
+  // a real logged-in session (requireSession, not just a typed nickname like
+  // profileRoutes.js's other actions) so a report is tied to a VERIFIED
+  // identity -- unlike viewing stats, there's nothing sensitive/actionable
+  // riding on a spoofed nickname elsewhere in this app, but here an admin
+  // may actually act on who said what. req.authSession.login is who
+  // requireSession already proved the caller is, so it's used directly
+  // rather than trusting a nickname field in the body.
+  router.post('/report', authSessions.requireSession, (req, res) => {
+    const { type, message } = req.body || {};
+    const result = reportsStore.createReport(req.authSession.login, type, message);
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json({ ok: true });
+  });
+
+  router.get('/admin/reports', authSessions.requireAdmin, (req, res) => {
+    res.json({ reports: reportsStore.listReports() });
+  });
+
+  // Pure organizing aid for the admin's own list (see reportsStore.setResolved's
+  // header comment) -- there's no reply/notification-to-player feature here.
+  router.patch('/admin/reports/:id', authSessions.requireAdmin, (req, res) => {
+    const result = reportsStore.setResolved(req.params.id, !!(req.body && req.body.resolved));
+    if (result.error) return res.status(404).json({ error: result.error });
+    res.json({ ok: true, report: result.report });
   });
 
   return router;

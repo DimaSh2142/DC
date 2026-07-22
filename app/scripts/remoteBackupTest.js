@@ -78,7 +78,15 @@ function assert(cond, msg) {
 .then(() => {
   console.log('\n--- hydrateFromRemote (mocked /pipeline response, real data/*.json backed up + restored) ---');
   const DATA_DIR = path.join(__dirname, '..', 'data');
-  const TRACKED_FILES = ['players.json', 'accounts.json', 'activity.json', 'usedThemes.json'];
+  // Derived from the real module's TRACKED_KEYS export (not a hardcoded
+  // duplicate list) so this test can't silently drift out of sync with it --
+  // exactly what happened when reports.json became a 5th tracked key
+  // (2026-07-22, "система репортів") but this list stayed hardcoded at the
+  // original 4, which quietly under-counted the pipeline's GET commands
+  // below until this test was re-run and caught it.
+  delete require.cache[require.resolve('../src/config')];
+  delete require.cache[require.resolve('../src/state/remoteBackup')];
+  const TRACKED_FILES = Object.keys(require('../src/state/remoteBackup').TRACKED_KEYS);
   const backups = {};
   TRACKED_FILES.forEach((f) => {
     const p = path.join(DATA_DIR, f);
@@ -94,19 +102,15 @@ function assert(cond, msg) {
   const fakeRemotePlayers = JSON.stringify({ restoredplayer: { nickname: 'restoredplayer', kkoin: 777 } });
   const realFetch = global.fetch;
   global.fetch = (url, opts) => {
-    assert(url === 'https://fake-test-db.upstash.io/pipeline', 'hydrateFromRemote hits the /pipeline endpoint (one round trip for all 4 keys, not 4 separate GETs)');
+    assert(url === 'https://fake-test-db.upstash.io/pipeline', 'hydrateFromRemote hits the /pipeline endpoint (one round trip for all tracked keys, not one GET per key)');
     const cmds = JSON.parse(opts.body);
-    assert(cmds.length === 4 && cmds.every((c) => c[0] === 'GET'), 'the pipeline body is exactly 4 GET commands, one per tracked key');
-    // Simulate: players has real data, accounts/activity/usedThemes were
-    // never written to Upstash yet (fresh DB) -- realistic "some keys
-    // populated, some not" mixed response.
+    assert(cmds.length === TRACKED_FILES.length && cmds.every((c) => c[0] === 'GET'), 'the pipeline body is exactly ' + TRACKED_FILES.length + ' GET commands, one per tracked key');
+    // Simulate: players has real data, every other tracked key was never
+    // written to Upstash yet (fresh DB) -- realistic "some keys populated,
+    // some not" mixed response. Matched to TRACKED_FILES by name (not
+    // position) so this stays correct regardless of TRACKED_KEYS' declared order.
     return Promise.resolve({
-      json: () => Promise.resolve([
-        { result: fakeRemotePlayers },
-        { result: null },
-        { result: null },
-        { result: null }
-      ])
+      json: () => Promise.resolve(TRACKED_FILES.map((f) => (f === 'players.json' ? { result: fakeRemotePlayers } : { result: null })))
     });
   };
 

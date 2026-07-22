@@ -453,7 +453,12 @@ th { color: var(--turquoise-dark); }
   transition: border-color .15s ease, transform .15s ease;
 }
 .avatar-preset-item:hover { border-color: var(--turquoise); transform: translateY(-2px); }
-.avatar-preset-item img { width: 56px; height: 56px; image-rendering: pixelated; }
+/* dima 2026-07-22 "зроби аватари круглими, а то дуже негарно виглядає, коли
+   вони не обрізані" -- same border-radius:50%+object-fit:cover crop avatarEl()
+   in common.js already applies to a chosen avatar everywhere else, just
+   applied here too so the picker's own preview thumbnails match instead of
+   showing the raw square KayKit art. */
+.avatar-preset-item img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; image-rendering: pixelated; }
 .roster-row { display: flex; align-items: center; gap: 8px; }
 .mini-roster { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 .mini-roster-row { display: flex; align-items: center; gap: 6px; font-size: 13px; }
@@ -1112,6 +1117,14 @@ input[type="range"] {
   background: linear-gradient(180deg, #5a2020 0%, #3a1212 28%, #28100a 60%, #140606 100%);
   box-shadow: inset 0 1px 2px rgba(255,80,80,.08), inset 0 -4px 8px rgba(0,0,0,.7);
 }
+/* dima 2026-07-22: re-sent the reference asking ships to look distinct, not
+   like 5 identical hulls -- one small per-type emoji on each ship's middle
+   segment (see battleship.js's SHIP_EMOJI/shipMiddleCellKey). */
+.bship-ship-badge {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1; pointer-events: none; opacity: .9;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.65));
+}
 .bship-hit-mark, .bship-miss-mark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .bship-hit-mark::after { content: ''; width: 46%; height: 46%; border-radius: 50%; background: radial-gradient(circle, #ff6b35 0%, #c0392b 70%, #7f1a1a 100%); box-shadow: 0 0 8px rgba(255,107,53,.55); }
 .bship-miss-mark::after { content: ''; width: 16%; height: 16%; border-radius: 50%; background: rgba(165,243,252,.4); }
@@ -1514,11 +1527,25 @@ input[type="range"] {
 }
 .ds-page .avatar-picker-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--ds-text-dim); text-align: center; margin-bottom: 14px; }
 .ds-page label { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ds-text-dimmer); display: block; margin-bottom: 8px; }
-.ds-page input[type="text"], .ds-page input[type="password"], .ds-page input[type="number"] {
+.ds-page input[type="text"], .ds-page input[type="password"], .ds-page input[type="number"], .ds-page textarea {
   width: 100%; background: rgba(255,255,255,.04); border: 1.5px solid var(--ds-border); color: var(--ds-text);
   border-radius: 10px; padding: 11px 14px; font-size: 14px; font-weight: 600;
 }
-.ds-page input[type="text"]:focus, .ds-page input[type="password"]:focus, .ds-page input[type="number"]:focus { outline: none; border-color: var(--turquoise); }
+.ds-page textarea { font-family: inherit; resize: vertical; min-height: 80px; }
+.ds-page input[type="text"]:focus, .ds-page input[type="password"]:focus, .ds-page input[type="number"]:focus, .ds-page textarea:focus { outline: none; border-color: var(--turquoise); }
+/* dima 2026-07-22 "система репортів" -- the idea/complaint type toggle
+   below just reuses the existing .tabs button(.active) look (see line
+   ~1568) rather than inventing a new control; only .tabs needs flex:1
+   buttons here since it's a 2-item toggle, not a wrapping filter row. */
+.ds-page #report-type-tabs button { flex: 1; }
+.ds-page .report-list { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; }
+.ds-page .report-card { background: rgba(255,255,255,.04); border: 1.5px solid var(--ds-border); border-radius: 10px; padding: 12px 14px; }
+.ds-page .report-card.resolved { opacity: .5; }
+.ds-page .report-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.ds-page .report-card-nick { font-weight: 800; font-size: 13px; color: var(--ds-text); }
+.ds-page .report-card-meta { font-size: 11px; color: var(--ds-text-dimmer); white-space: nowrap; }
+.ds-page .report-card-msg { font-size: 13px; color: var(--ds-text-dim); line-height: 1.5; white-space: pre-wrap; margin-bottom: 8px; }
+.ds-page .report-empty { text-align: center; color: var(--ds-text-dimmer); font-size: 13px; padding: 18px 0; }
 .ds-page .btn-small { font-size: 12px; padding: 10px 16px; border-radius: 10px; font-weight: 800; letter-spacing: .5px; }
 .ds-page .btn-small:not(.btn-outline) { background: var(--ds-mint); color: #04140D; }
 .ds-page .btn-small:not(.btn-outline):hover { background: #58e6ac; }

@@ -13,14 +13,20 @@
 // disconnect/reconnect just re-attaches the same nickname to its seat
 // (playerIdx 0 or 1) rather than losing the game.
 
+const config = require('../config');
 const playersStore = require('./playersStore');
 const battleship = require('../games/battleship');
 const checkers = require('../games/checkers');
 const chess = require('../games/chess');
 const tictactoe = require('../games/tictactoe'); // 2026-07-22: 4th mini-game, mirrors checkers.js's module shape exactly -- see that file's own header comment
+const tictactoeBot = require('../games/tictactoeBot'); // 2026-07-22 "грати з ШІ" -- see createAIRoom/maybeTriggerAIMove below
 
 const GAME_MODULES = { battleship, checkers, chess, tictactoe };
 const GAME_LABELS = { battleship: 'Морський бій', checkers: 'Шашки', chess: 'Шахи', tictactoe: 'Хрестики-нулики' };
+// Sentinel player key for the bot seat in a vs-AI room (see createAIRoom) --
+// deliberately not a value playersStore.keyOf() could ever produce from a
+// real typed nickname, so it can never collide with an actual player.
+const AI_PLAYER_KEY = '__ai__';
 
 // Optional-require + try/catch guard, same pattern as blackjackTableManager.js
 // /rouletteTableManager.js/plinkoManager.js -- 2026-07-22 cabinet rebuild
@@ -91,6 +97,57 @@ class MiniGameManager {
     return { room };
   }
 
+  // dima 2026-07-22 "зроби щоб у хрестики нулики можна було грати з ШІ" --
+  // a solo room that skips the whole "share a code, wait for a second human"
+  // flow: the second seat is a synthetic bot player, filled in and playing
+  // immediately. Deliberately scoped to tictactoe only for now (that's what
+  // was actually asked for; nothing here stops extending GAME_MODULES-wide
+  // later, but checkers/chess bots are a much bigger lift -- tic-tac-toe's
+  // whole game tree is small enough for exact minimax, see tictactoeBot.js).
+  // No stakes: playing a bot for KKoin doesn't mean anything, so this never
+  // even accepts a stake argument.
+  createAIRoom(gameType, nickname, socketId, avatar) {
+    if (gameType !== 'tictactoe') return { error: 'Гра проти ШІ поки доступна лише для хрестиків-нуликів' };
+    const key = playersStore.keyOf(nickname);
+    if (!key) return { error: 'Порожній нікнейм' };
+    let code;
+    do { code = randomCode(4); } while (this.rooms.has(code));
+    const room = new MiniGameRoom(code, gameType);
+    room.vsAI = true;
+    room.players.push({ key, nickname: String(nickname).trim(), avatar: avatar || null, socketId, connected: true });
+    room.players.push({ key: AI_PLAYER_KEY, nickname: 'ШІ 🤖', avatar: null, socketId: null, connected: true });
+    room.status = 'playing';
+    room.gameState = GAME_MODULES[gameType].createInitialState();
+    this.rooms.set(code, room);
+    return { room, playerIdx: 0 };
+  }
+
+  // After a human move in a vs-AI room, if it's now the bot's turn, computes
+  // and applies its move a beat later (an instant reply reads as robotic/
+  // suspicious, same reasoning a chess app's "AI is thinking..." pause
+  // exists for). onMoved(room) lets the socket layer -- which owns
+  // io/broadcasting, not this pure state module -- push the result to the
+  // human's socket once it happens, same pattern as scheduleDisconnectForfeit.
+  maybeTriggerAIMove(room, onMoved) {
+    if (!room.vsAI || room.gameType !== 'tictactoe' || room.status !== 'playing') return;
+    const aiIdx = room.players.findIndex(p => p.key === AI_PLAYER_KEY);
+    if (aiIdx === -1 || room.gameState.turn !== aiIdx) return;
+    const humanIdx = 1 - aiIdx;
+    setTimeout(() => {
+      // Room could have moved on since this was scheduled (a fast rematch,
+      // or it somehow finished another way) -- re-check everything fresh
+      // rather than trusting the closure's snapshot of the situation.
+      if (room.status !== 'playing' || room.gameState.turn !== aiIdx) return;
+      const move = tictactoeBot.pickMove(room.gameState.board, aiIdx, humanIdx);
+      if (move === null) return;
+      const result = tictactoe.applyMove(room.gameState, aiIdx, move);
+      if (result.ok) {
+        this.applyModuleResult(room, result);
+        if (onMoved) onMoved(room);
+      }
+    }, 550);
+  }
+
   getRoom(code) {
     return this.rooms.get(String(code || '').trim().toUpperCase());
   }
@@ -120,7 +177,14 @@ class MiniGameManager {
       existing.socketId = socketId;
       existing.connected = true;
       if (avatar) existing.avatar = avatar;
-      return { room, player: existing, playerIdx: room.players.indexOf(existing), reconnect: true };
+      const existingIdx = room.players.indexOf(existing);
+      // A real reconnect (page refresh, brief network blip) -- cancel any
+      // pending auto-forfeit timer this player's earlier disconnect started
+      // (see scheduleDisconnectForfeit below). Both mg:join_room's own
+      // reconnect branch and the dedicated mg:reconnect handler funnel
+      // through here, so one cancel call covers both.
+      this.cancelDisconnectForfeit(room, existingIdx);
+      return { room, player: existing, playerIdx: existingIdx, reconnect: true };
     }
     if (room.players.length >= 2) return { error: 'Кімната вже заповнена (2/2 гравці)' };
 
@@ -165,6 +229,39 @@ class MiniGameManager {
     }
   }
 
+  // dima 2026-07-22 "коли один гравець виходить з лобі - другому автоматом
+  // зараховували перемогу в любій грі". A raw socket disconnect (tab closed,
+  // wifi drop, or a genuine walk-away) looks identical to a page refresh at
+  // the instant it happens -- mgTryReconnect already re-attaches a refreshed
+  // tab to its seat within a second or two, so instantly forfeiting on
+  // disconnect would wrongly punish that. Instead: give it
+  // config.MINIGAME_DISCONNECT_FORFEIT_MS to come back (see joinRoom's
+  // reconnect branch, which cancels this the moment it does); only once
+  // that grace period elapses with the player STILL disconnected does the
+  // other seat win automatically, via the exact same resign() an explicit
+  // "здатися" click already uses. onForfeit(room) lets the socket layer
+  // (which owns io/broadcasting, not this pure state module) notify both
+  // players once it actually happens.
+  scheduleDisconnectForfeit(room, playerIdx, onForfeit) {
+    this.cancelDisconnectForfeit(room, playerIdx);
+    if (!room.forfeitTimers) room.forfeitTimers = {};
+    room.forfeitTimers[playerIdx] = setTimeout(() => {
+      delete room.forfeitTimers[playerIdx];
+      if (room.status !== 'playing') return; // already ended some other way (resign, normal win, etc.)
+      const player = room.players[playerIdx];
+      if (!player || player.connected) return; // reconnected (or seat gone) in the meantime
+      const result = this.resign(room, playerIdx);
+      if (result.ok && onForfeit) onForfeit(room);
+    }, config.MINIGAME_DISCONNECT_FORFEIT_MS);
+  }
+
+  cancelDisconnectForfeit(room, playerIdx) {
+    if (room.forfeitTimers && room.forfeitTimers[playerIdx]) {
+      clearTimeout(room.forfeitTimers[playerIdx]);
+      delete room.forfeitTimers[playerIdx];
+    }
+  }
+
   // Explicit forfeit -- simplest possible way to end a game that's gone
   // stale (opponent AFK) without needing per-game "give up" logic; the
   // OTHER seated player is declared the winner regardless of game type.
@@ -191,6 +288,7 @@ class MiniGameManager {
     const winnerIdx = room.gameState.winnerIdx;
     const isDraw = winnerIdx !== 0 && winnerIdx !== 1;
     room.players.forEach((p, idx) => {
+      if (p.key === AI_PLAYER_KEY) return; // no real player behind the bot seat -- nothing to log/touch in playersStore
       const won = !isDraw && idx === winnerIdx;
       let detail;
       if (isDraw) {

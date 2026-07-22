@@ -24,6 +24,16 @@ module.exports = {
   DEFAULT_NUM_TEAMS: 2, // dima 2026-07-21: "Зроби щоб по базі стояло 2 команди, а не 3"
   ADMIN_TOKEN_TTL_MS: 24 * 60 * 60 * 1000, // 24h
 
+  // dima 2026-07-22 "коли один гравець виходить з лобі - другому автоматом
+  // зараховували перемогу в любій грі" -- how long a mini-game (Battleship/
+  // Checkers/Chess/Хрестики-нулики) opponent can stay disconnected before
+  // the other player is auto-awarded the win (see miniGameManager.js's
+  // scheduleDisconnectForfeit). Long enough that an ordinary page-refresh
+  // reconnect (mgTryReconnect already handles this instantly and shouldn't
+  // ever trip this) never gets punished, short enough nobody's stuck
+  // waiting on a genuinely abandoned match. Same 45s as ANSWER_TIMEOUT_MS.
+  MINIGAME_DISCONNECT_FORFEIT_MS: 45000,
+
   // KKoin economy (2026-07-21 "глобальний проект" expansion). Awarded to the
   // WINNING team in the quiz, split evenly across that team's members --
   // spendable later in Казино / мінi-ігри. Kept as a single tunable pool

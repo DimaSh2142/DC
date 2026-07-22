@@ -10,6 +10,12 @@
   const GRID_SIZE = 10;
   const SHIP_SIZES = [5, 4, 3, 3, 2];
   const SHIP_NAMES = ['Авіаносець', 'Лінкор', 'Крейсер', 'Підводний човен', 'Есмінець'];
+  // Small per-type icon (2026-07-22, dima re-sent the reference and asked
+  // ships to visually differ, not just look like identical gradient blocks)
+  // -- shown once on each ship's middle segment. Indexed to match SHIP_NAMES
+  // exactly; server sends the matching typeIndex back on gs.myShips /
+  // gs.opponentSunkShips (see src/games/battleship.js's submitLayout).
+  const SHIP_EMOJI = ['🛩️', '🎯', '📡', '〰️', '⚡'];
   const COL_LABELS = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К'];
   // Matches minigames.html's .ds-card--turquoise hue -- see minigame-common.js's
   // mgAccentStyle header comment for the full per-game color mapping.
@@ -37,6 +43,55 @@
   function canPlace(x, y, size, dir) {
     const occ = placedCellSet();
     return shipCellsFor(x, y, size, dir).every(([cx, cy]) => cx >= 0 && cx < GRID_SIZE && cy >= 0 && cy < GRID_SIZE && !occ.has(cx + ',' + cy));
+  }
+
+  // Which cell (as an 'x,y' key) a ship's per-type emoji badge sits on --
+  // the roughly-middle segment, so it reads as "this ship's icon" rather
+  // than looking like it belongs to the bow or stern specifically.
+  function shipMiddleCellKey(cells) {
+    if (!cells.length) return null;
+    const horizontal = cells.every(([, cy]) => cy === cells[0][1]);
+    const sorted = cells.slice().sort((a, b) => horizontal ? a[0] - b[0] : a[1] - b[1]);
+    const mid = sorted[Math.floor((sorted.length - 1) / 2)];
+    return mid[0] + ',' + mid[1];
+  }
+
+  // "Авто-розстановка" (2026-07-22, dima re-sent the reference and asked
+  // for this button specifically) -- always starts from a clean board and
+  // randomly places all 5 ships at once. Pure client-side convenience; the
+  // server validates the resulting layout exactly the same as a manually
+  // placed one (see mg:battleship_submit_layout), so there's no new trust
+  // surface here. Retries with fresh random spots per ship, and retries the
+  // WHOLE fleet from scratch if it paints itself into a corner (rare at 17
+  // of 100 cells occupied, but 10x10 with 5 ships isn't literally
+  // guaranteed to succeed on every attempt) -- 300 whole-fleet attempts is
+  // enormous overkill for how easy this board is to fill, so a genuine
+  // failure toast should never actually happen in practice.
+  function autoPlaceAll() {
+    for (let attempt = 0; attempt < 300; attempt++) {
+      const trial = [];
+      const occ = new Set();
+      let ok = true;
+      for (const size of SHIP_SIZES) {
+        let placedOne = false;
+        for (let tries = 0; tries < 200; tries++) {
+          const dir = Math.random() < 0.5 ? 'H' : 'V';
+          const x = Math.floor(Math.random() * GRID_SIZE);
+          const y = Math.floor(Math.random() * GRID_SIZE);
+          const cells = shipCellsFor(x, y, size, dir);
+          const fits = cells.every(([cx, cy]) => cx >= 0 && cx < GRID_SIZE && cy >= 0 && cy < GRID_SIZE && !occ.has(cx + ',' + cy));
+          if (fits) {
+            cells.forEach(([cx, cy]) => occ.add(cx + ',' + cy));
+            trial.push({ x, y, dir, size });
+            placedOne = true;
+            break;
+          }
+        }
+        if (!placedOne) { ok = false; break; }
+      }
+      if (ok) { placements = trial; render(); return; }
+    }
+    toast('Не вдалося авто-розставити флот, спробуй ще раз', true);
   }
 
   // ---- shared v2 board rendering (2026-07-22 visual overhaul, see the
@@ -116,10 +171,11 @@
       done ? 'Усі кораблі розміщено! Перевірте флот і натисніть «Готово».' : ('Розмістіть: ' + SHIP_NAMES[nextIdx] + ' (' + SHIP_SIZES[nextIdx] + ' кл.)')
     ]));
 
-    wrap.appendChild(el('div', { class: 'row', style: 'justify-content:center; margin-bottom:10px; gap:10px;' }, [
+    wrap.appendChild(el('div', { class: 'row', style: 'justify-content:center; margin-bottom:10px; gap:10px; flex-wrap:wrap;' }, [
       el('button', { class: 'btn-small btn-outline', disabled: done ? 'disabled' : null, onclick: () => { placeDir = placeDir === 'H' ? 'V' : 'H'; render(); } },
         [(placeDir === 'H' ? '↔ Горизонтально' : '↕ Вертикально')]),
-      el('button', { class: 'btn-small btn-outline crimson', onclick: () => { placements = []; render(); } }, ['⟲ Скинути'])
+      el('button', { class: 'btn-small btn-outline crimson', onclick: () => { placements = []; render(); } }, ['⟲ Скинути']),
+      el('button', { class: 'btn-small btn-outline', onclick: autoPlaceAll }, ['✨ Авто-розстановка'])
     ]));
 
     // Ship-type legend (matches PlacementPhase.jsx's dot-pip row) -- placed
@@ -138,7 +194,16 @@
     ));
 
     const segClassMap = new Map();
-    placements.forEach(p => shipSegClasses(shipCellsFor(p.x, p.y, p.size, p.dir), null).forEach((cls, key) => segClassMap.set(key, cls)));
+    const badgeMap = new Map();
+    placements.forEach((p, i) => {
+      const cells = shipCellsFor(p.x, p.y, p.size, p.dir);
+      shipSegClasses(cells, null).forEach((cls, key) => segClassMap.set(key, cls));
+      // Local placements[] is always pushed in strict SHIP_SIZES/SHIP_NAMES
+      // order (see the "Розмістіть: SHIP_NAMES[nextIdx]" flow above), so
+      // index i IS the type index here -- no need for the server's
+      // typeIndex until battle phase, where gs.myShips loses that ordering.
+      badgeMap.set(shipMiddleCellKey(cells), SHIP_EMOJI[i]);
+    });
     const cellNodes = new Map();
     function clearPreview() { cellNodes.forEach(node => node.classList.remove('preview-ok', 'preview-bad')); }
 
@@ -168,6 +233,7 @@
         }
       }, []);
       if (segClassMap.has(key)) btn.appendChild(el('div', { class: segClassMap.get(key) }, []));
+      if (badgeMap.has(key)) btn.appendChild(el('div', { class: 'bship-ship-badge' }, [badgeMap.get(key)]));
       cellNodes.set(key, btn);
       return btn;
     });
@@ -201,11 +267,13 @@
     const myShots = new Map();
     gs.shotsOnMe.forEach(s => myShots.set(s.x + ',' + s.y, s.hit));
     const myShipSegClasses = new Map();
+    const myBadges = new Map();
     const mySunkKeys = new Set();
     gs.myShips.forEach(s => {
       const sunk = s.cells.every(([cx, cy]) => myShots.get(cx + ',' + cy) === true);
       if (sunk) s.cells.forEach(([cx, cy]) => mySunkKeys.add(cx + ',' + cy));
       shipSegClasses(s.cells, sunk ? 'sunk' : null).forEach((cls, key) => myShipSegClasses.set(key, cls));
+      if (Number.isInteger(s.typeIndex)) myBadges.set(shipMiddleCellKey(s.cells), SHIP_EMOJI[s.typeIndex]);
     });
     const myBoard = buildBoardWrap((x, y) => {
       const key = x + ',' + y;
@@ -214,6 +282,7 @@
         let segCls = myShipSegClasses.get(key);
         if (myShots.get(key) === true && !mySunkKeys.has(key)) segCls += ' hit';
         btn.appendChild(el('div', { class: segCls }, []));
+        if (myBadges.has(key)) btn.appendChild(el('div', { class: 'bship-ship-badge' }, [myBadges.get(key)]));
       }
       if (myShots.has(key)) {
         const hit = myShots.get(key);
@@ -232,10 +301,12 @@
     const oppShots = new Map();
     gs.shotsIFired.forEach(s => oppShots.set(s.x + ',' + s.y, s.hit));
     const oppSunkSegClasses = new Map();
+    const oppSunkBadges = new Map();
     const oppSunkKeys = new Set();
     gs.opponentSunkShips.forEach(s => {
       s.cells.forEach(([cx, cy]) => oppSunkKeys.add(cx + ',' + cy));
       shipSegClasses(s.cells, 'sunk').forEach((cls, key) => oppSunkSegClasses.set(key, cls));
+      if (Number.isInteger(s.typeIndex)) oppSunkBadges.set(shipMiddleCellKey(s.cells), SHIP_EMOJI[s.typeIndex]);
     });
     const canFire = gs.turn === playerIdx;
     const oppBoard = buildBoardWrap((x, y) => {
@@ -265,7 +336,10 @@
       // Fog of war: a sunk ship reveals its full hull shape; a hit that
       // hasn't sunk its ship yet only reveals a hit-mark on this one square
       // (we don't know the rest of that ship's shape until it's sunk).
-      if (sunk && oppSunkSegClasses.has(key)) btn.appendChild(el('div', { class: oppSunkSegClasses.get(key) }, []));
+      if (sunk && oppSunkSegClasses.has(key)) {
+        btn.appendChild(el('div', { class: oppSunkSegClasses.get(key) }, []));
+        if (oppSunkBadges.has(key)) btn.appendChild(el('div', { class: 'bship-ship-badge' }, [oppSunkBadges.get(key)]));
+      }
       if (alreadyShot) {
         const hit = oppShots.get(key);
         if (hit && !sunk) btn.appendChild(el('div', { class: 'bship-hit-mark' }, []));

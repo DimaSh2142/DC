@@ -42,7 +42,11 @@ const TRACKED_KEYS = {
   'players.json': 'dsland:players',
   'accounts.json': 'dsland:accounts',
   'activity.json': 'dsland:activity',
-  'usedThemes.json': 'dsland:usedThemes'
+  'usedThemes.json': 'dsland:usedThemes',
+  // 2026-07-22 "система репортів" (player ideas/complaints, admin-reviewed)
+  // -- same reasoning as the other 4: a real player-submitted report lost to
+  // a Render redeploy would be genuinely gone, not just regeneratable state.
+  'reports.json': 'dsland:reports'
 };
 
 const REST_URL = (config.UPSTASH_REDIS_REST_URL || '').replace(/\/+$/, '');

@@ -3,27 +3,24 @@
 // ---- site-wide personal settings ("Особистий кабінет" -> Налаштування, added
 // 2026-07-21) -- pure client-side presentation prefs, deliberately NOT sent
 // to the server (unlike nickname/avatar/kkoin in playersStore, these aren't
-// "who you are", just "how loud/which theme on THIS device"). Read by every
-// page via common.js (loaded before player.js/admin.js/profile.js on all of
-// them) so a setting changed once in the profile page applies everywhere.
+// "who you are", just "how loud on THIS device"). Read by every page via
+// common.js (loaded before player.js/admin.js/profile.js on all of them) so
+// a setting changed once in the profile page applies everywhere.
 const SETTINGS_KEYS = {
-  theme: 'sigame_theme',              // 'light' | 'dark'
   musicVolume: 'sigame_music_volume', // 0-100, applied to admin/team YouTube players
   micVolume: 'sigame_mic_volume'      // 0-100, applied to OTHER participants' voice-chat audio playback
 };
 
-function getTheme() { return localStorage.getItem(SETTINGS_KEYS.theme) === 'dark' ? 'dark' : 'light'; }
-function setTheme(theme) {
-  localStorage.setItem(SETTINGS_KEYS.theme, theme === 'dark' ? 'dark' : 'light');
-  applyTheme();
-}
-function applyTheme() {
-  document.documentElement.setAttribute('data-theme', getTheme());
-}
-// Runs the instant this script is parsed (common.js is loaded before the
-// page's own content/scripts on every page) -- avoids a flash of the light
-// theme before a later DOMContentLoaded handler would otherwise fix it.
-applyTheme();
+// DSLand is dark-only (2026-07-22, dima: "забери взагалі це налаштування
+// теми, сайт д завжди темним буде" -- remove the theme setting entirely, the
+// site should always be dark). This used to be a user-toggleable light/dark
+// preference (profile.js's old theme-tabs UI, now removed); [data-theme="dark"]
+// in style.css still holds the actual dark color overrides -- that block is
+// the real source of truth for --bg/--surface/--text etc., this just forces
+// it on unconditionally instead of leaving it opt-in. Runs the instant this
+// script is parsed (common.js loads before every page's own content) so
+// there's no flash of the old light palette before this would otherwise run.
+document.documentElement.setAttribute('data-theme', 'dark');
 
 function clampPercent(v, fallback) {
   const n = parseInt(v, 10);

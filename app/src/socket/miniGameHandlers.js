@@ -53,6 +53,23 @@ function registerMiniGameHandlers(io, { miniGameManager }) {
       if (cb) cb({ ok: true, room: miniGameManager.publicState(result.room, 0), playerIdx: 0 });
     }));
 
+    // dima 2026-07-22 "зроби щоб у хрестики нулики можна було грати з ШІ" --
+    // skips the join-a-second-human flow entirely, see
+    // miniGameManager.createAIRoom's own header comment.
+    socket.on('mg:create_ai_room', safe(async (payload, cb) => {
+      const gameType = payload && payload.gameType;
+      const nickname = (payload && payload.nickname || '').trim().slice(0, 24);
+      const avatar = payload && payload.avatar;
+      if (!nickname) return cb && cb({ error: 'Введіть нікнейм' });
+      const result = miniGameManager.createAIRoom(gameType, nickname, socket.id, avatar);
+      if (result.error) return cb && cb({ error: result.error });
+
+      socket.data.mgRoomCode = result.room.code;
+      socket.data.mgNickname = nickname;
+      socket.join('mg-' + result.room.code);
+      if (cb) cb({ ok: true, room: miniGameManager.publicState(result.room, 0), playerIdx: 0 });
+    }));
+
     socket.on('mg:join_room', safe(async (payload, cb) => {
       const gameType = payload && payload.gameType;
       const roomCode = (payload && payload.roomCode || '').trim().toUpperCase();
@@ -162,6 +179,9 @@ function registerMiniGameHandlers(io, { miniGameManager }) {
       miniGameManager.applyModuleResult(room, result);
       broadcastRoomState(room);
       if (cb) cb({ ok: true });
+      // vs-AI room and it's now the bot's turn -- reply a beat later (see
+      // maybeTriggerAIMove's own header comment).
+      miniGameManager.maybeTriggerAIMove(room, (r) => broadcastRoomState(r));
     }));
 
     // ---------- shared ----------
@@ -184,13 +204,31 @@ function registerMiniGameHandlers(io, { miniGameManager }) {
       if (result.error) return cb && cb({ error: result.error });
       broadcastRoomState(room);
       if (cb) cb({ ok: true });
+      // rematch() reverses seats -- if that put the bot in the now-first-
+      // moving seat, let it open the new game.
+      miniGameManager.maybeTriggerAIMove(room, (r) => broadcastRoomState(r));
     }));
 
     socket.on('disconnect', () => {
       miniGameManager.disconnectSocket(socket.id);
       if (socket.data.mgRoomCode) {
         const room = miniGameManager.getRoom(socket.data.mgRoomCode);
-        if (room) broadcastRoomState(room);
+        if (room) {
+          broadcastRoomState(room);
+          // dima 2026-07-22 "коли один гравець виходить з лобі - другому
+          // автоматом зараховували перемогу" -- only meaningful mid-game
+          // (an empty 'waiting' room or battleship's pre-battle 'placing'
+          // sub-phase has no match in progress to forfeit; room.status is
+          // already 'playing' by the time placing starts, see
+          // miniGameManager.joinRoom). See scheduleDisconnectForfeit's own
+          // header comment for the grace-period reasoning.
+          if (room.status === 'playing') {
+            const idx = miniGameManager.playerIdxOf(room, playersStore.keyOf(socket.data.mgNickname));
+            if (idx !== -1) {
+              miniGameManager.scheduleDisconnectForfeit(room, idx, (finishedRoom) => broadcastRoomState(finishedRoom));
+            }
+          }
+        }
       }
     });
   });

@@ -128,8 +128,8 @@
 
   function showJoinScreen() {
     mgRenderJoinScreen(socket, app, {
-      gameType: GAME_TYPE, gameLabel: 'Хрестики-нулики', emoji: '❌⭕', accent: ACCENT,
-      tagline: 'Класична гра на 2 гравці',
+      gameType: GAME_TYPE, gameLabel: 'Хрестики-нулики', emoji: '❌⭕', accent: ACCENT, vsAI: true,
+      tagline: 'Класична гра на 2 гравці — або проти ШІ',
       onJoined: ({ roomCode: rc, playerIdx: pi, room }) => { roomCode = rc; playerIdx = pi; roomState = room; render(); }
     });
   }

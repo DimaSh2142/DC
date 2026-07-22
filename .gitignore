@@ -14,6 +14,9 @@ app/data/accounts.json
 # per-player activity log (2026-07-22 cabinet rebuild, src/state/activityStore.js)
 # -- same "runtime state, not source" reasoning as the three files above
 app/data/activity.json
+# player-submitted ideas/complaints ("система репортів", 2026-07-22,
+# src/state/reportsStore.js) -- same "runtime state, not source" reasoning
+app/data/reports.json
 
 # user-submitted SiGame packs ("Закинь українізовану SiGame" button) — may
 # contain copyrighted third-party media, same reasoning as reference/ below;

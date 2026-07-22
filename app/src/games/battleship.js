@@ -67,7 +67,24 @@ function submitLayout(state, playerIdx, placements) {
   if (state.ready[playerIdx]) return { error: 'Ви вже розмістили кораблі' };
   const v = validateLayout(placements);
   if (v.error) return { error: v.error };
-  state.boards[playerIdx].ships = v.allCells.map(cells => ({ cells, size: cells.length, hits: 0 }));
+  // typeIndex (2026-07-22, dima asked the board to visually distinguish ship
+  // types like his reference screenshot) lets the client show a distinct
+  // icon per ship TYPE (Carrier/Battleship/Cruiser/Submarine/Destroyer --
+  // see battleship.js's SHIP_NAMES) instead of 5 identical hulls. Resolved
+  // here by matching each placed ship's SIZE against SHIP_SIZES's slots
+  // (consuming duplicates in submission order for the two size-3 types)
+  // rather than trusting placements[] order directly -- our own client
+  // always submits in SHIP_SIZES order so this resolves "correctly" in
+  // practice, but this way an out-of-order submission still gets *a*
+  // sensible index instead of a silently wrong one.
+  const remainingSlots = SHIP_SIZES.map((size, idx) => idx);
+  const typeIndexes = v.allCells.map((cells) => {
+    const size = cells.length;
+    const slot = remainingSlots.find((idx) => SHIP_SIZES[idx] === size);
+    remainingSlots.splice(remainingSlots.indexOf(slot), 1);
+    return slot;
+  });
+  state.boards[playerIdx].ships = v.allCells.map((cells, i) => ({ cells, size: cells.length, hits: 0, typeIndex: typeIndexes[i] }));
   state.ready[playerIdx] = true;
   if (state.ready[0] && state.ready[1]) state.phase = 'battle';
   return { ok: true, bothReady: state.phase === 'battle' };
@@ -114,10 +131,10 @@ function getPublicView(state, viewerIdx) {
     ready: state.ready.slice(),
     turn: state.turn,
     winnerIdx: state.winnerIdx,
-    myShips: myBoard.ships.map(s => ({ cells: s.cells, size: s.size, hits: s.hits, sunk: s.hits === s.size })),
+    myShips: myBoard.ships.map(s => ({ cells: s.cells, size: s.size, hits: s.hits, sunk: s.hits === s.size, typeIndex: s.typeIndex })),
     shotsOnMe: myBoard.shotsAgainst,
     shotsIFired: oppBoard.shotsAgainst,
-    opponentSunkShips: oppBoard.ships.filter(s => s.hits === s.size).map(s => ({ cells: s.cells, size: s.size }))
+    opponentSunkShips: oppBoard.ships.filter(s => s.hits === s.size).map(s => ({ cells: s.cells, size: s.size, typeIndex: s.typeIndex }))
   };
 }
 
