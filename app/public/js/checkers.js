@@ -24,6 +24,9 @@
   const app = document.getElementById('app');
   const GAME_TYPE = 'checkers';
   const PIECE_IMG = { 0: '/img/checkers/man-white.png', 1: '/img/checkers/man-red.png' };
+  // Matches minigames.html's .ds-card--crimson hue -- see minigame-common.js's
+  // mgAccentStyle header comment for the full per-game color mapping.
+  const ACCENT = '#D7263D';
 
   let roomCode = null;
   let playerIdx = null;
@@ -37,7 +40,7 @@
   function render() {
     clear(app);
     if (!roomState) return;
-    if (roomState.status === 'waiting') return mgRenderWaitingForOpponent(app, roomCode, { stake: roomState.stake });
+    if (roomState.status === 'waiting') return mgRenderWaitingForOpponent(app, roomCode, { stake: roomState.stake, accent: ACCENT });
     if (roomState.status === 'finished') return renderFinishedScreen();
     renderGame();
   }
@@ -122,7 +125,8 @@
 
   function showJoinScreen() {
     mgRenderJoinScreen(socket, app, {
-      gameType: GAME_TYPE, gameLabel: 'Шашки', emoji: '🔴',
+      gameType: GAME_TYPE, gameLabel: 'Шашки', emoji: '🔴', accent: ACCENT,
+      tagline: 'Класична гра на 2 гравці',
       onJoined: ({ roomCode: rc, playerIdx: pi, room }) => { roomCode = rc; playerIdx = pi; roomState = room; selected = null; render(); }
     });
   }

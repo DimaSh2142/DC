@@ -981,28 +981,141 @@ input[type="range"] {
 .mg-boards-row { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
 .mg-board-label { text-align: center; font-weight: 700; margin-bottom: 6px; font-size: 13px; color: var(--turquoise-dark); }
 
+/* ============ Mini-game lobby chrome (join/create + waiting screens) ============
+   2026-07-22: dima uploaded a base44 "GameLobby.jsx" reference and asked the
+   join/create-room screen -- shared by all 4 mini-games via mgRenderJoinScreen/
+   mgRenderWaitingForOpponent in minigame-common.js -- to reach the same
+   polish level as the mini-games hub itself (minigames.html's .ds-card grid,
+   which already matched the reference closely). One shared block covers all
+   4 games: each call site sets --mg-accent/--mg-glow inline to its own hue,
+   reusing the exact same per-game colors minigames.html's .ds-card--* already
+   established (turquoise=battleship, crimson=checkers, orange=chess,
+   gold=tictactoe) rather than inventing a 5th palette. */
+.mg-lobby-wrap { position: relative; min-height: 82vh; display: flex; align-items: center; justify-content: center; padding: 40px 16px; overflow: hidden; }
+.mg-lobby-wrap::before {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(900px 600px at 50% 8%, var(--mg-glow, rgba(23,184,166,.16)), transparent 70%),
+              radial-gradient(700px 500px at 85% 92%, rgba(23,184,166,.08), transparent 60%);
+}
+.mg-lobby-wrap::after {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: .04;
+  background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+.mg-lobby-card {
+  position: relative; z-index: 1; width: 100%; max-width: 420px;
+  border-radius: 26px; border: 1px solid var(--ds-border, rgba(230,247,245,.14));
+  background: rgba(22,27,34,.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  padding: 30px 28px; box-shadow: 0 30px 70px rgba(0,0,0,.5);
+}
+.mg-lobby-card::before {
+  content: ''; position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+  width: 66%; height: 1px; background: linear-gradient(90deg, transparent, var(--mg-accent, #17B8A6), transparent);
+}
+.mg-lobby-back { display: block; margin-bottom: 4px; }
+.mg-lobby-icon-wrap { position: relative; width: 76px; height: 76px; margin: 14px auto 0; display: flex; align-items: center; justify-content: center; }
+.mg-lobby-icon-wrap::before { content: ''; position: absolute; inset: -14px; border-radius: 50%; background: var(--mg-accent, #17B8A6); opacity: .3; filter: blur(20px); }
+.mg-lobby-icon { position: relative; font-size: 44px; line-height: 1; filter: drop-shadow(0 8px 16px var(--mg-glow, rgba(23,184,166,.4))); }
+.mg-lobby-title { text-align: center; font-size: 25px; font-weight: 900; color: var(--ds-text, #EAF6F4); margin: 12px 0 2px; }
+.mg-lobby-tagline { text-align: center; font-size: 13px; color: var(--ds-text-dim, rgba(234,246,244,.6)); margin: 0 0 22px; }
+.mg-lobby-field-label { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.mg-lobby-field-label span:first-child { font-size: 12px; font-weight: 800; color: var(--ds-text, #EAF6F4); }
+.mg-lobby-balance { font-size: 11px; color: var(--ds-text-dimmer, rgba(234,246,244,.38)); }
+.mg-lobby-input {
+  width: 100%; box-sizing: border-box; border-radius: 14px; border: 1px solid var(--ds-border, rgba(230,247,245,.14));
+  background: rgba(0,0,0,.35); color: var(--ds-text, #EAF6F4); font-size: 16px; font-weight: 700; padding: 13px 16px; outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.mg-lobby-input::placeholder { color: var(--ds-text-dimmer, rgba(234,246,244,.38)); }
+.mg-lobby-input:focus { border-color: var(--mg-accent, #17B8A6); box-shadow: 0 0 0 3px var(--mg-glow, rgba(23,184,166,.25)); }
+.mg-lobby-cta {
+  margin-top: 18px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 99rem; padding: 15px; font-size: 15px; font-weight: 800; color: #04130f; border: none; cursor: pointer;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mg-accent, #17B8A6) 80%, white), var(--mg-accent, #17B8A6));
+  box-shadow: 0 12px 26px var(--mg-glow, rgba(23,184,166,.35));
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.mg-lobby-cta:hover { transform: translateY(-1px); }
+.mg-lobby-cta:active { transform: translateY(0); }
+.mg-lobby-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; }
+.mg-lobby-divider span { flex: 1; height: 1px; background: var(--ds-border, rgba(230,247,245,.14)); }
+.mg-lobby-divider em { font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--ds-text-dimmer, rgba(234,246,244,.38)); }
+.mg-lobby-join-row { display: flex; gap: 8px; }
+.mg-lobby-join-row .mg-lobby-input { text-transform: uppercase; letter-spacing: 3px; font-size: 15px; }
+.mg-lobby-join-btn {
+  flex: none; border-radius: 14px; border: 1px solid var(--ds-border, rgba(230,247,245,.14)); background: rgba(255,255,255,.04);
+  color: var(--ds-text, #EAF6F4); font-size: 13px; font-weight: 800; padding: 0 20px; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.mg-lobby-join-btn:hover:not(:disabled) { border-color: var(--mg-accent, #17B8A6); background: rgba(255,255,255,.07); }
+.mg-lobby-join-btn:disabled { opacity: .5; cursor: not-allowed; }
+.mg-lobby-note { text-align: center; font-size: 11px; line-height: 1.6; color: var(--ds-text-dimmer, rgba(234,246,244,.38)); margin: 18px 0 0; }
+.mg-lobby-waiting-code {
+  text-align: center; font-family: ui-monospace, monospace; font-size: 34px; font-weight: 900; letter-spacing: 6px;
+  color: var(--mg-accent, #17B8A6); margin: 14px 0; text-shadow: 0 0 24px var(--mg-glow, rgba(23,184,166,.5));
+}
+@media (prefers-reduced-motion: reduce) { .mg-lobby-cta { transition: none; } }
+
+/* ============ Battleship board v2 (2026-07-22 visual overhaul) ============
+   dima uploaded a base44 reference (GameGrid.jsx/ShipSegment.jsx/
+   ShotEffect.jsx/WaterBackground.jsx) purely for its LOOK -- that reference
+   is a single-player-vs-AI demo with a different ship roster; ours keeps the
+   existing 5-ship/10x10 server-authoritative rules and lobby entirely
+   untouched (see battleship.js), only the rendering changed: coordinate
+   labels, gradient hull ships with rounded bow/stern, hit/sunk color states,
+   and hit/miss/placement-preview effects now match the reference's dark
+   teal "radar" look instead of the old flat turquoise-on-white cells. */
+.bship-board-wrap { display: inline-flex; flex-direction: column; }
+.bship-col-labels { display: flex; padding-left: 22px; }
+.bship-col-labels span {
+  display: flex; align-items: center; justify-content: center; width: var(--bship-cell, 30px);
+  font: 700 10px ui-monospace, monospace; color: rgba(45,198,168,.5); padding-bottom: 3px;
+}
+.bship-board-row { display: flex; }
+.bship-row-labels { display: flex; flex-direction: column; }
+.bship-row-labels span {
+  display: flex; align-items: center; justify-content: center; width: 20px; height: var(--bship-cell, 30px);
+  font: 700 10px ui-monospace, monospace; color: rgba(45,198,168,.5); padding-right: 2px;
+}
 .bship-grid {
   display: grid;
-  grid-template-columns: repeat(10, minmax(0, 28px));
-  grid-template-rows: repeat(10, minmax(0, 28px));
-  gap: 2px;
+  grid-template-columns: repeat(10, var(--bship-cell, 30px));
+  grid-template-rows: repeat(10, var(--bship-cell, 30px));
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(45,198,168,.18);
+  box-shadow: 0 0 24px rgba(45,198,168,.08), inset 0 0 24px rgba(0,0,0,.45);
 }
 .bship-cell {
-  width: 100%; height: 100%;
-  border: none; border-radius: 4px;
-  background: var(--turquoise-light);
-  cursor: pointer;
-  padding: 0;
-  font-size: 13px;
-  display: flex; align-items: center; justify-content: center;
-  transition: transform .1s ease, background-color .15s ease;
+  position: relative; width: var(--bship-cell, 30px); height: var(--bship-cell, 30px);
+  border: 1px solid rgba(14,110,100,.18); padding: 0; cursor: default;
+  background: linear-gradient(135deg, #0a1a1e 0%, #0d2030 50%, #0a1520 100%);
+  transition: background-color .15s ease;
 }
-.bship-cell:hover:not(:disabled) { transform: scale(1.08); }
-.bship-cell:disabled { cursor: default; }
-.bship-cell.ship { background: var(--turquoise-dark); }
-.bship-cell.miss { background: var(--turquoise-light); color: var(--turquoise-dark); }
-.bship-cell.hit { background: var(--crimson); color: var(--white); }
-.bship-cell.sunk { background: var(--crimson-dark); color: var(--white); }
+.bship-cell.usable { cursor: pointer; }
+.bship-cell.usable:hover { background: rgba(23,184,166,.14); }
+.bship-cell.preview-ok { background: rgba(74,224,192,.16) !important; box-shadow: inset 0 0 0 2px rgba(74,224,192,.55); }
+.bship-cell.preview-bad { background: rgba(239,68,68,.16) !important; box-shadow: inset 0 0 0 2px rgba(239,68,68,.55); }
+.bship-ship-seg {
+  position: absolute; inset: 2px; border-radius: 4px;
+  background: linear-gradient(180deg, #6aeccc 0%, #3dd6b8 14%, #2dc6a8 34%, #1a9c84 56%, #0d6b5a 78%, #074d40 100%);
+  box-shadow: inset 0 2px 3px rgba(255,255,255,.28), inset 0 -4px 8px rgba(0,0,0,.4), inset 3px 0 4px rgba(255,255,255,.06);
+}
+.bship-ship-seg.bow-h { border-radius: 12px 4px 4px 12px; }
+.bship-ship-seg.stern-h { border-radius: 4px 12px 12px 4px; }
+.bship-ship-seg.bow-v { border-radius: 12px 12px 4px 4px; }
+.bship-ship-seg.stern-v { border-radius: 4px 4px 12px 12px; }
+.bship-ship-seg.hit {
+  background: linear-gradient(180deg, #d4842a 0%, #a05818 28%, #6a3010 60%, #3a1608 100%);
+  box-shadow: inset 0 2px 3px rgba(255,200,100,.15), inset 0 -4px 8px rgba(0,0,0,.5);
+}
+.bship-ship-seg.sunk {
+  background: linear-gradient(180deg, #5a2020 0%, #3a1212 28%, #28100a 60%, #140606 100%);
+  box-shadow: inset 0 1px 2px rgba(255,80,80,.08), inset 0 -4px 8px rgba(0,0,0,.7);
+}
+.bship-hit-mark, .bship-miss-mark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.bship-hit-mark::after { content: ''; width: 46%; height: 46%; border-radius: 50%; background: radial-gradient(circle, #ff6b35 0%, #c0392b 70%, #7f1a1a 100%); box-shadow: 0 0 8px rgba(255,107,53,.55); }
+.bship-miss-mark::after { content: ''; width: 16%; height: 16%; border-radius: 50%; background: rgba(165,243,252,.4); }
+.bship-danger-line { position: relative; }
 
 /* dima 2026-07-22 "збільши розмір шах і шашок (саме поле і шахмати) а то
    дуже маленьке" -- cell size bumped 44px -> 60px (~36%). .checkers-piece
@@ -1080,36 +1193,33 @@ input[type="range"] {
 .chess-cell.selected { box-shadow: inset 0 0 0 3px var(--crimson); }
 .chess-cell.last-move { box-shadow: inset 0 0 0 3px var(--turquoise); }
 
-/* ---- Tic-Tac-Toe (2026-07-22, 4th mini-game) -- reuses the same
-   selectable/win highlight language as checkers/chess above. X/O marks are
-   voxel-rendered tile sprites (app/scripts/renderVoxToPng.py, same pipeline
-   as the checkers pieces) rather than plain text glyphs. ---- */
-.ttt-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 96px));
-  grid-template-rows: repeat(3, minmax(0, 96px));
-  gap: 6px;
-  border: 3px solid var(--turquoise-dark);
-  border-radius: 12px;
-  padding: 6px;
-  background: var(--turquoise-dark);
-}
+/* ---- Tic-Tac-Toe board v2 (2026-07-22 visual overhaul) -- dima uploaded a
+   base44 reference (XOMark.jsx/WinLine.jsx/ResultModal.jsx) purely for its
+   LOOK; server-authoritative rules/room lifecycle (src/games/tictactoe.js,
+   miniGameManager) are completely untouched, only rendering changed. Marks
+   switched from voxel PNG tile sprites back to inline glowing SVG strokes to
+   match the reference exactly (pink X / teal O) -- see tictactoe.js's
+   markSvg() for how the markup is built via el()'s `html` option. ---- */
+.ttt-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 100px)); grid-template-rows: repeat(3, minmax(0, 100px)); gap: 10px; position: relative; }
 .ttt-cell {
-  background: var(--turquoise-light);
-  border: none; border-radius: 8px; padding: 0;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
+  position: relative; background: linear-gradient(135deg, #14161c, #0d0f14);
+  border: 1px solid rgba(255,255,255,.05); border-radius: 16px; padding: 0;
+  box-shadow: inset 0 0 20px rgba(0,0,0,.35); cursor: pointer;
+  transition: transform .1s ease, border-color .15s ease, background .15s ease;
 }
+.ttt-cell.selectable:hover { transform: scale(1.04); border-color: rgba(255,255,255,.14); }
 .ttt-cell:disabled { cursor: default; }
-.ttt-cell.selectable { box-shadow: inset 0 0 0 3px var(--orange); }
-.ttt-cell.win-line { box-shadow: inset 0 0 0 3px var(--crimson); background: rgba(215,38,61,.18); }
-.ttt-mark-img {
-  width: 72%; height: 72%; object-fit: contain;
-  image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;
-  pointer-events: none;
-}
+.ttt-cell.selectable { box-shadow: inset 0 0 0 2px rgba(255,193,7,.35), inset 0 0 20px rgba(0,0,0,.35); }
+.ttt-cell.win-line { background: linear-gradient(135deg, rgba(255,107,138,.12), rgba(255,107,138,.04)); border-color: rgba(255,107,138,.3); }
+.ttt-mark-svg { position: absolute; inset: 0; width: 65%; height: 65%; margin: auto; animation: ttt-mark-pop .22s cubic-bezier(.34,1.56,.64,1); }
+.ttt-mark-svg.mark-x line { stroke: #ff6b8a; filter: drop-shadow(0 0 6px rgba(255,107,138,.6)); }
+.ttt-mark-svg.mark-o circle { stroke: #5ae8cc; filter: drop-shadow(0 0 6px rgba(90,232,204,.5)); }
+.ttt-winline-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ttt-winline-svg line { stroke: #ff6b8a; stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255,107,138,.8)); }
+@keyframes ttt-mark-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ttt-mark-svg { animation: none; } }
 @media (max-width: 640px) {
-  .ttt-grid { grid-template-columns: repeat(3, minmax(0, 78px)); grid-template-rows: repeat(3, minmax(0, 78px)); }
+  .ttt-grid { grid-template-columns: repeat(3, minmax(0, 84px)); grid-template-rows: repeat(3, minmax(0, 84px)); }
 }
 
 /* ---- chess piece sprites (2026-07-22 texture swap, "simple-chess-skyel"

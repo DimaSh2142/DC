@@ -73,6 +73,10 @@ function buildProfileRouter(roomManager) {
     const nickname = String(req.params.nickname || '').trim();
     if (!nickname) return res.status(400).json({ error: 'Введіть нікнейм' });
     const profile = playersStore.getProfile(nickname);
+    // Opening your own cabinet (or any page that loads your full profile) is
+    // itself "being on the site right now" -- see playersStore.touchLastSeen's
+    // comment for the full 2026-07-22 "останнє на сайті" fix reasoning.
+    playersStore.touchLastSeen(nickname);
     res.json({
       profile,
       locked: roomManager.isNicknameInActiveGame(nickname),

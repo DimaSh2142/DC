@@ -67,43 +67,65 @@ function mgRenderJoinScreen(socket, app, opts) {
       });
     }
 
+    // dima 2026-07-22: uploaded a base44 "GameLobby.jsx" reference and asked
+    // this join/create screen to match the mini-games hub's own polish level
+    // (minigames.html's .ds-card grid). accentVars carries each game's own
+    // hue -- see the mgRenderJoinScreen call sites in battleship.js/
+    // checkers.js/chess.js/tictactoe.js -- reusing the exact colors
+    // minigames.html's .ds-card--* already established, not a new palette.
+    const accentVars = mgAccentStyle(opts.accent);
     clear(app);
-    app.appendChild(el('div', { class: 'center-screen', style: 'min-height:80vh;' }, [
-      el('div', { class: 'card', style: 'max-width:420px; width:100%;' }, [
-        el('a', { href: '/minigames.html', class: 'back-link' }, ['← До міні-ігор']),
-        el('div', { style: 'text-align:center; font-size:40px; margin-bottom:6px;' }, [opts.emoji]),
-        el('h1', { style: 'text-align:center; margin-top:0;' }, [opts.gameLabel]),
+    app.appendChild(el('div', { class: 'mg-lobby-wrap', style: accentVars }, [
+      el('div', { class: 'mg-lobby-card' }, [
+        el('a', { href: '/minigames.html', class: 'back-link mg-lobby-back' }, ['← До міні-ігор']),
+        el('div', { class: 'mg-lobby-icon-wrap' }, [el('div', { class: 'mg-lobby-icon' }, [opts.emoji])]),
+        el('h1', { class: 'mg-lobby-title' }, [opts.gameLabel]),
+        opts.tagline ? el('p', { class: 'mg-lobby-tagline' }, [opts.tagline]) : null,
         // dima 2026-07-22 "забери ось це Граєш як, всерівно гравці ж
         // зареєстровані і знають свої ніки" -- nickname is still used
         // internally (doCreate/doJoin close over it), just no longer shown.
-        el('div', { class: 'field' }, [
-          el('div', { class: 'row between', style: 'align-items:baseline;' }, [el('label', { style: 'margin:0;' }, ['Ставка (KKoin), необов’язково']), balanceLabel]),
-          stakeInput
+        el('div', { class: 'mg-lobby-field-label' }, [el('span', {}, ['Ставка (KKoin), необов’язково']), balanceLabel]),
+        stakeInput,
+        el('button', { class: 'mg-lobby-cta', onclick: doCreate }, ['✨ Створити нову гру']),
+        el('div', { class: 'mg-lobby-divider' }, [el('span', {}), el('em', {}, ['або']), el('span', {})]),
+        el('label', { class: 'mg-lobby-field-label' }, [el('span', {}, ['Приєднатись за кодом'])]),
+        el('div', { class: 'mg-lobby-join-row' }, [
+          codeInput,
+          el('button', { class: 'mg-lobby-join-btn', onclick: doJoin }, ['Приєднатись'])
         ]),
-        el('div', { class: 'stack' }, [
-          el('button', { onclick: doCreate }, ['Створити нову гру']),
-          el('div', { class: 'row', style: 'align-items:flex-end;' }, [
-            el('div', { class: 'field', style: 'flex:1; margin-bottom:0;' }, [el('label', {}, ['Або приєднатись за кодом']), codeInput]),
-            el('button', { class: 'btn-outline', onclick: doJoin }, ['Приєднатись'])
-          ]),
-          el('p', { style: 'font-size:11px; color:var(--turquoise-dark); text-align:center; margin:2px 0 0;' }, ['Якщо у кімнати є ставка, той хто приєднується має мати стільки ж KKoin -- сума спишеться з обох одразу, як гра почнеться, і переможець забирає банк.'])
-        ])
+        el('p', { class: 'mg-lobby-note' }, ['Якщо у кімнаті є ставка, той хто приєднується має мати стільки ж KKoin — сума спишеться з обох одразу, як гра почнеться, і переможець забирає банк.'])
       ])
     ]));
+    codeInput.className = 'mg-lobby-input';
+    stakeInput.className = 'mg-lobby-input';
     codeInput.focus();
   }
+}
+
+// Each game's own accent (see the mgRenderJoinScreen({accent: '#rrggbb'})
+// call sites) reuses minigames.html's .ds-card--* hues exactly:
+//   battleship=turquoise #17B8A6, checkers=crimson #D7263D,
+//   chess=orange #F2994A, tictactoe=gold #DAA520.
+// Kept as one small helper (rather than 4 near-duplicate rgba literals
+// scattered across game files) so the accent->glow conversion only needs to
+// be right in one place.
+function mgAccentStyle(hex) {
+  const h = hex || '#17B8A6';
+  const r = parseInt(h.slice(1, 3), 16), g = parseInt(h.slice(3, 5), 16), b = parseInt(h.slice(5, 7), 16);
+  return '--mg-accent:' + h + '; --mg-glow: rgba(' + r + ',' + g + ',' + b + ',.28);';
 }
 
 function mgRenderWaitingForOpponent(app, roomCode, opts) {
   clear(app);
   const stake = opts && opts.stake;
-  app.appendChild(el('div', { class: 'center-screen', style: 'min-height:80vh;' }, [
-    el('div', { class: 'card', style: 'max-width:420px; width:100%; text-align:center;' }, [
-      el('a', { href: '/minigames.html', class: 'back-link' }, ['← До міні-ігор']),
-      el('h2', {}, ['Очікуємо суперника…']),
-      el('p', {}, ['Надішліть цей код другові:']),
-      el('div', { class: 'room-code' }, [roomCode]),
-      stake > 0 ? el('p', { style: 'font-weight:700; color:var(--orange); margin-top:10px;' }, ['\u{1FA99} Гра на ставку: ' + stake + ' KKoin (спишеться з обох, щойно суперник приєднається)']) : null,
+  const accentVars = mgAccentStyle(opts && opts.accent);
+  app.appendChild(el('div', { class: 'mg-lobby-wrap', style: accentVars }, [
+    el('div', { class: 'mg-lobby-card', style: 'text-align:center;' }, [
+      el('a', { href: '/minigames.html', class: 'back-link mg-lobby-back' }, ['← До міні-ігор']),
+      el('h2', { class: 'mg-lobby-title', style: 'margin-top:14px;' }, ['Очікуємо суперника…']),
+      el('p', { class: 'mg-lobby-tagline' }, ['Надішліть цей код другові:']),
+      el('div', { class: 'mg-lobby-waiting-code' }, [roomCode]),
+      stake > 0 ? el('p', { style: 'font-weight:700; color:var(--orange); margin-top:6px; font-size:13px;' }, ['\u{1FA99} Гра на ставку: ' + stake + ' KKoin (спишеться з обох, щойно суперник приєднається)']) : null,
       opts && opts.extra ? opts.extra : null
     ])
   ]));

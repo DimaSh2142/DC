@@ -25,7 +25,6 @@
   const avatarPresetBtn = document.getElementById('avatar-preset-btn');
   const nicknameInput = document.getElementById('nickname-input');
   const saveNicknameBtn = document.getElementById('save-nickname-btn');
-  const switchProfileBtn = document.getElementById('switch-profile-btn');
   const logoutBtn = document.getElementById('logout-btn');
   const accountBadge = document.getElementById('account-badge');
   const adminGrantPanel = document.getElementById('admin-grant-panel');
@@ -337,22 +336,8 @@
     cabinetBackLink.onclick = null;
   }
 
-  // dima 2026-07-21 screenshot 1: "щоб повернення було назад в кабінет а не
-  // на головну" -- only relevant in the one moment the gate is shown WHILE a
-  // cabinet was already open (i.e. mid "Інший нікнейм"): "back" there should
-  // cancel that and return to the cabinet you already had open, not bounce
-  // you out to the homepage. On a fresh page load (no cabinet opened yet)
-  // the link stays the ordinary home link -- there's nothing to "go back" to.
-  function setBackLinkToCabinet() {
-    cabinetBackLink.textContent = '← Назад у кабінет';
-    cabinetBackLink.href = '#';
-    cabinetBackLink.onclick = (e) => {
-      e.preventDefault();
-      gateSection.style.display = 'none';
-      profileSection.style.display = '';
-      setBackLinkToHome();
-    };
-  }
+  // (setBackLinkToCabinet removed -- 2026-07-22, its only caller was the
+  // deleted "Інший" button's click handler)
 
   // Tries logging in with whatever password was typed; if this nickname has
   // no account yet, treats typing a password at all as "create one for me"
@@ -425,21 +410,6 @@
     if (!nickname) return toast('Введіть нікнейм', true);
     if (!password) return toast('Введіть пароль', true);
     authenticateAndOpen(nickname, password);
-  });
-
-  switchProfileBtn.addEventListener('click', () => {
-    // dima 2026-07-21 "видали гостя, зроби реєстрацію обов'язковою скрізь" --
-    // тепер обов'язково чистимо кешовану сесію тут теж: інакше requireAccount()
-    // (common.js) на будь-якій іншій сторінці мовчки залогінив би НАСТУПНОГО
-    // гравця на цьому пристрої під СТАРИМ акаунтом (кешований токен), навіть
-    // якщо в кабінеті хтось явно натиснув "Інший".
-    clearAuth();
-    profileSection.style.display = 'none';
-    gateSection.style.display = '';
-    gateInput.value = '';
-    gatePasswordInput.value = '';
-    setBackLinkToCabinet();
-    gateInput.focus();
   });
 
   logoutBtn.addEventListener('click', () => {

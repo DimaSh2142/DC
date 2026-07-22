@@ -38,9 +38,8 @@ function setMicVolume(v) { localStorage.setItem(SETTINGS_KEYS.micVolume, String(
 // Layered on top of the existing nickname-is-identity model (see
 // playersStore.js) -- an account's login IS the nickname, and this is just
 // an optional token+role remembered client-side after a successful
-// login/registration in Особистий кабінет (see profile.js). Read by quiz.js
-// (to decide whether to show the "Адмін-панель" button) and profile.js (to
-// decide whether to show the admin-only "видати KKrampus coin" panel). NOT itself a
+// login/registration in Особистий кабінет (see profile.js). Read by profile.js
+// (to decide whether to show the admin-only "видати KKrampus coin" panel). NOT itself a
 // security boundary -- the server independently re-checks the token/role on
 // every protected request (see authSessions.js's requireAdmin), so worst
 // case a stale/tampered value here just shows or hides a button wrongly for

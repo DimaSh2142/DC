@@ -16,6 +16,9 @@
   const socket = io();
   const app = document.getElementById('app');
   const GAME_TYPE = 'chess';
+  // Matches minigames.html's .ds-card--orange hue -- see minigame-common.js's
+  // mgAccentStyle header comment for the full per-game color mapping.
+  const ACCENT = '#F2994A';
   const FILES = 'abcdefgh';
   const PIECE_TYPE_NAMES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
   const PIECE_COLOR_NAMES = { w: 'white', b: 'black' };
@@ -35,7 +38,7 @@
   function render() {
     clear(app);
     if (!roomState) return;
-    if (roomState.status === 'waiting') return mgRenderWaitingForOpponent(app, roomCode, { stake: roomState.stake });
+    if (roomState.status === 'waiting') return mgRenderWaitingForOpponent(app, roomCode, { stake: roomState.stake, accent: ACCENT });
     if (roomState.status === 'finished') return renderFinishedScreen();
     renderGame();
   }
@@ -138,7 +141,8 @@
 
   function showJoinScreen() {
     mgRenderJoinScreen(socket, app, {
-      gameType: GAME_TYPE, gameLabel: 'Шахи', emoji: '♟️',
+      gameType: GAME_TYPE, gameLabel: 'Шахи', emoji: '♟️', accent: ACCENT,
+      tagline: 'Класична гра на 2 гравці',
       onJoined: ({ roomCode: rc, playerIdx: pi, room }) => { roomCode = rc; playerIdx = pi; roomState = room; selected = null; render(); }
     });
   }

@@ -81,6 +81,24 @@ function recordAnswer(nickname, wasCorrect) {
   return data[key];
 }
 
+/**
+ * Marks a nickname as active right now, no other side effect -- broader than
+ * recordAnswer's lastSeen touch (which only fires on a quiz answer). Called
+ * from activityStore.logActivity (any real in-game result: quiz win,
+ * mini-game finish, casino settle) and from GET /api/profile/:nickname
+ * (opening your own cabinet, or any page that loads your full profile) --
+ * together these make "останнє на сайті" honestly track recent activity
+ * instead of only the last quiz question answered (2026-07-22 fix, dima:
+ * "коли я в мережі чомусь пише що я на сайті останній раз 13хв").
+ */
+function touchLastSeen(nickname) {
+  const data = load();
+  const key = keyOf(nickname);
+  if (!data[key]) getOrCreatePlayer(nickname);
+  data[key].lastSeen = new Date().toISOString();
+  save();
+}
+
 function markPlayed(nicknames) {
   const data = load();
   for (const nickname of nicknames) {
@@ -236,5 +254,5 @@ function advanceBubbleLevel(nickname, clearedLevel, rewardAmount) {
 
 module.exports = {
   getOrCreatePlayer, recordAnswer, markPlayed, getAllPlayers, getStatsFor, keyOf, adjustAnswer,
-  getProfile, setAvatar, renameNickname, addKkoin, advanceBubbleLevel, getRank
+  getProfile, setAvatar, renameNickname, addKkoin, advanceBubbleLevel, getRank, touchLastSeen
 };

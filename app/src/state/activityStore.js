@@ -18,6 +18,7 @@
 
 const path = require('path');
 const { readJson, writeJsonAtomic } = require('./jsonStore');
+const playersStore = require('./playersStore');
 const playersStoreKeyOf = (nickname) => String(nickname || '').trim().toLowerCase();
 
 const FILE = path.join(__dirname, '..', '..', 'data', 'activity.json');
@@ -51,6 +52,10 @@ function logActivity(nickname, entry) {
   });
   if (data[key].length > MAX_PER_PLAYER) data[key].length = MAX_PER_PLAYER;
   save();
+  // Any real logged activity (quiz win, mini-game finish, casino settle) also
+  // counts as "on the site right now" -- see playersStore.touchLastSeen's own
+  // comment for the full 2026-07-22 fix reasoning.
+  playersStore.touchLastSeen(nickname);
 }
 
 function getRecentActivity(nickname, limit = 20) {
