@@ -17,9 +17,21 @@ const playersStore = require('./playersStore');
 const battleship = require('../games/battleship');
 const checkers = require('../games/checkers');
 const chess = require('../games/chess');
+const tictactoe = require('../games/tictactoe'); // 2026-07-22: 4th mini-game, mirrors checkers.js's module shape exactly -- see that file's own header comment
 
-const GAME_MODULES = { battleship, checkers, chess };
-const GAME_LABELS = { battleship: 'Морський бій', checkers: 'Шашки', chess: 'Шахи' };
+const GAME_MODULES = { battleship, checkers, chess, tictactoe };
+const GAME_LABELS = { battleship: 'Морський бій', checkers: 'Шашки', chess: 'Шахи', tictactoe: 'Хрестики-нулики' };
+
+// Optional-require + try/catch guard, same pattern as blackjackTableManager.js
+// /rouletteTableManager.js/plinkoManager.js -- 2026-07-22 cabinet rebuild
+// wiring real data into ActivityFeed/ActivityChart for the 4 mini-games too
+// (previously only the casino table games logged here).
+let activityStore = null;
+try { activityStore = require('./activityStore'); } catch (e) { /* optional, see logActivity() below */ }
+function logActivity(nickname, entry) {
+  if (!activityStore) return;
+  try { activityStore.logActivity(nickname, entry); } catch (e) { /* best-effort only */ }
+}
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I, same as roomManager.js
 function randomCode(len = 4) {
@@ -163,7 +175,33 @@ class MiniGameManager {
     if (room.gameState) room.gameState.winnerIdx = 1 - playerIdx;
     room.updatedAt = Date.now();
     this.settleStakes(room);
+    this.logGameFinish(room);
     return { ok: true, winnerIdx: 1 - playerIdx };
+  }
+
+  // Real activity-feed entry for both seated players the instant a mini-game
+  // room finishes (win/loss/draw/resign) -- 2026-07-22 cabinet rebuild, same
+  // "win only true on an outright win" accent convention blackjackTableManager
+  // already established for Казино · Блекджек (стіл) (a push/draw there is
+  // deliberately win:false too, i.e. dimmer, not a loss-red but not a bright
+  // win either).
+  logGameFinish(room) {
+    if (!room.gameState || room.players.length < 2) return;
+    const label = 'Міні-ігри · ' + this.gameLabel(room.gameType);
+    const winnerIdx = room.gameState.winnerIdx;
+    const isDraw = winnerIdx !== 0 && winnerIdx !== 1;
+    room.players.forEach((p, idx) => {
+      const won = !isDraw && idx === winnerIdx;
+      let detail;
+      if (isDraw) {
+        detail = 'Нічия' + (room.stake > 0 ? ' · ставку повернено' : '');
+      } else if (won) {
+        detail = (room.resignedIdx === (1 - idx) ? 'Перемога (суперник здався)' : 'Перемога') + (room.stake > 0 ? (' · +' + room.stake + ' KKoin') : '');
+      } else {
+        detail = (room.resignedIdx === idx ? 'Ви здалися' : 'Поразка') + (room.stake > 0 ? (' · -' + room.stake + ' KKoin') : '');
+      }
+      logActivity(p.nickname, { label, detail, accent: won ? '#00FFD1' : (isDraw ? '#666666' : '#C71585'), win: won });
+    });
   }
 
   // Pays out a staked room's pot the instant it becomes "finished" -- the
@@ -227,7 +265,7 @@ class MiniGameManager {
     if (room.gameState && room.gameState.drawReason) {
       room.status = 'finished';
     }
-    if (room.status === 'finished') this.settleStakes(room);
+    if (room.status === 'finished') { this.settleStakes(room); this.logGameFinish(room); }
     return result;
   }
 

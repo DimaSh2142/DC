@@ -5,15 +5,21 @@
 // checkers.js. playerIdx 0 is always White, playerIdx 1 always Black (fixed
 // at room creation); Black's board is visually rotated 180 degrees so both
 // players see their own back rank at the bottom of their own screen.
+//
+// Piece rendering (2026-07-22 texture swap, dima's "simple-chess-skyel"
+// pack): flat pre-rendered PNG sprites under /img/chess/ instead of Unicode
+// glyphs -- see style.css's .chess-piece-img for the pixelated upscale (the
+// source art is tiny, ~12-14px). Purely a rendering swap, same as
+// checkers.js's own header comment on its own texture pass -- the legality
+// engine in src/games/chess.js is completely untouched.
 (function () {
   const socket = io();
   const app = document.getElementById('app');
   const GAME_TYPE = 'chess';
   const FILES = 'abcdefgh';
-  const PIECE_GLYPHS = {
-    w: { p: '♙', n: '♘', b: '♗', r: '♖', q: '♕', k: '♔' },
-    b: { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' }
-  };
+  const PIECE_TYPE_NAMES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+  const PIECE_COLOR_NAMES = { w: 'white', b: 'black' };
+  function pieceImgSrc(color, type) { return '/img/chess/' + PIECE_TYPE_NAMES[type] + '-' + PIECE_COLOR_NAMES[color] + '.png'; }
   const PROMOTION_CHOICES = [['q', 'Ферзь ♛'], ['r', 'Тура ♜'], ['b', 'Слон ♝'], ['n', 'Кінь ♞']];
 
   let roomCode = null;
@@ -83,7 +89,11 @@
 
         const isMine = !!cellPiece && ((cellPiece.color === 'w' && playerIdx === 0) || (cellPiece.color === 'b' && playerIdx === 1));
         const isSelectableOrigin = myTurn && isMine && selectableFromSet.has(sq);
-        const glyph = cellPiece ? PIECE_GLYPHS[cellPiece.color][cellPiece.type] : '';
+        const pieceNode = cellPiece ? el('img', {
+          src: pieceImgSrc(cellPiece.color, cellPiece.type),
+          alt: PIECE_COLOR_NAMES[cellPiece.color] + ' ' + PIECE_TYPE_NAMES[cellPiece.type],
+          class: 'chess-piece-img'
+        }) : null;
 
         grid.appendChild(el('button', {
           class: cls,
@@ -100,7 +110,7 @@
               render();
             }
           }
-        }, [glyph]));
+        }, [pieceNode]));
       }
     }
     wrap.appendChild(el('div', { style: 'display:flex; justify-content:center; margin-top:8px;' }, [grid]));

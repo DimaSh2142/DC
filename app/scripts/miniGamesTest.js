@@ -7,6 +7,7 @@
 const battleship = require('../src/games/battleship');
 const checkers = require('../src/games/checkers');
 const chess = require('../src/games/chess');
+const tictactoe = require('../src/games/tictactoe');
 
 let passed = 0, failed = 0;
 function assert(cond, msg) {
@@ -294,6 +295,91 @@ function assert(cond, msg) {
 
   const mateView = chess.getPublicView(mateState);
   assert(mateView.legalMoves.length === 0, 'once the game has ended (checkmate), legalMoves is empty -- nothing left to click');
+})();
+
+// ================= TIC-TAC-TOE =================
+// 4th mini-game (2026-07-22). Mirrors checkers/chess coverage shape: initial
+// state, legal-move gating, every win-line orientation, the draw case, turn
+// alternation, and getPublicView's post-game legalMoves-empties-out contract.
+(function testTicTacToe() {
+  console.log('\n--- Tic-Tac-Toe ---');
+  const state = tictactoe.createInitialState();
+  assert(state.board.length === 9 && state.board.every(c => c === null), 'new game starts with an empty 3x3 board (9 nulls)');
+  assert(state.turn === 0, 'player 0 (X) moves first');
+  assert(state.winnerIdx === null && state.drawReason === null, 'a fresh game has no winner and no draw yet');
+
+  const legal0 = tictactoe.getLegalMoves(state, 0);
+  assert(legal0.length === 9, 'all 9 cells are legal for the opening move');
+  const wrongTurn = tictactoe.getLegalMoves(state, 1);
+  assert(wrongTurn.length === 0, "it isn't player 1's turn yet, so their legal-move list is empty");
+
+  const badTurn = tictactoe.applyMove(state, 1, 0);
+  assert(!!badTurn.error, "rejects a move from playerIdx 1 (O) when it's X's turn");
+
+  const mv = tictactoe.applyMove(state, 0, 4); // X takes center
+  assert(mv.ok && state.board[4] === 0, "a legal move for player 0 is applied to the board (center marked with player 0's index)");
+  assert(state.turn === 1, 'turn passes to player 1 after a move that neither wins nor draws');
+
+  const dupCell = tictactoe.applyMove(state, 1, 4);
+  assert(!!dupCell.error, 'a move onto an already-occupied cell is rejected');
+
+  const oobLow = tictactoe.applyMove(state, 1, -1);
+  assert(!!oobLow.error, 'a move with an out-of-range index (< 0) is rejected');
+  const oobHigh = tictactoe.applyMove(state, 1, 9);
+  assert(!!oobHigh.error, 'a move with an out-of-range index (> 8) is rejected');
+
+  // ---- every win-line orientation ----
+  function playLine(moves) {
+    // moves: array of {p, i} played in order; returns the final applyMove result
+    const s = tictactoe.createInitialState();
+    let res;
+    for (const { p, i } of moves) res = tictactoe.applyMove(s, p, i);
+    return { s, res };
+  }
+  const topRow = playLine([{ p: 0, i: 0 }, { p: 1, i: 3 }, { p: 0, i: 1 }, { p: 1, i: 4 }, { p: 0, i: 2 }]);
+  assert(topRow.res.ok && topRow.res.winnerIdx === 0, 'top row (0,1,2) is detected as a win for X');
+  assert(JSON.stringify(topRow.s.winningLine) === JSON.stringify([0, 1, 2]), 'winningLine records the exact 3 cell indices of the top row');
+
+  const midCol = playLine([{ p: 0, i: 1 }, { p: 1, i: 0 }, { p: 0, i: 4 }, { p: 1, i: 2 }, { p: 0, i: 7 }]);
+  assert(midCol.res.ok && midCol.res.winnerIdx === 0, 'middle column (1,4,7) is detected as a win for X');
+
+  const mainDiag = playLine([{ p: 0, i: 0 }, { p: 1, i: 1 }, { p: 0, i: 4 }, { p: 1, i: 2 }, { p: 0, i: 8 }]);
+  assert(mainDiag.res.ok && mainDiag.res.winnerIdx === 0, 'main diagonal (0,4,8) is detected as a win for X');
+
+  const antiDiag = playLine([{ p: 0, i: 2 }, { p: 1, i: 0 }, { p: 0, i: 4 }, { p: 1, i: 1 }, { p: 0, i: 6 }]);
+  assert(antiDiag.res.ok && antiDiag.res.winnerIdx === 0, 'anti-diagonal (2,4,6) is detected as a win for X');
+
+  const oWins = playLine([{ p: 0, i: 0 }, { p: 1, i: 3 }, { p: 0, i: 1 }, { p: 1, i: 4 }, { p: 0, i: 8 }, { p: 1, i: 5 }]);
+  assert(oWins.res.ok && oWins.res.winnerIdx === 1, "O (playerIdx 1) can also win, e.g. the bottom-half row (3,4,5)");
+
+  const afterWin = tictactoe.applyMove(mainDiag.s, 1, 3);
+  assert(!!afterWin.error, 'no further moves are accepted once the game has ended in a win');
+
+  // ---- draw: full board, nobody completed a line ----
+  // X O X / X O O / O X X  -- verify no line is complete, then confirm draw.
+  const drawMoves = [
+    { p: 0, i: 0 }, { p: 1, i: 1 }, { p: 0, i: 2 },
+    { p: 1, i: 4 }, { p: 0, i: 3 }, { p: 1, i: 5 },
+    { p: 0, i: 7 }, { p: 1, i: 6 }, { p: 0, i: 8 }
+  ];
+  const drawResult = playLine(drawMoves);
+  assert(drawResult.s.board.every(c => c !== null), 'the scripted draw scenario fills the entire board');
+  assert(drawResult.res.ok && drawResult.res.winnerIdx === null, 'a filled board with no line completed reports no winner');
+  assert(!!drawResult.s.drawReason, 'drawReason is set once the board fills up with no winner');
+
+  // ---- getPublicView ----
+  const freshState = tictactoe.createInitialState();
+  const freshView = tictactoe.getPublicView(freshState);
+  assert(freshView.board.length === 9, 'getPublicView exposes the flat 9-cell board array');
+  assert(freshView.legalMoves.length === 9, "a fresh game's public view lists all 9 cells as legal");
+  assert(freshView.winningLine === null, 'a fresh game has no winningLine yet');
+
+  const finishedView = tictactoe.getPublicView(mainDiag.s);
+  assert(finishedView.legalMoves.length === 0, 'once the game has ended (win), legalMoves is empty -- nothing left to click');
+  assert(finishedView.winnerIdx === 0, "the finished view reports X's win");
+
+  const drawView = tictactoe.getPublicView(drawResult.s);
+  assert(drawView.legalMoves.length === 0, "a drawn (full) board's public view also has an empty legalMoves list");
 })();
 
 console.log('\n=== ' + passed + '/' + (passed + failed) + ' mini-game assertions passed ===');

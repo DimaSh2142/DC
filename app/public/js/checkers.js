@@ -6,10 +6,24 @@
 // flipped for playerIdx 1 so BOTH players always see their own pieces at
 // the bottom of the screen, matching how a real physical board would sit
 // between two people.
+//
+// Piece rendering (2026-07-22 texture pass): the pieces are rendered from
+// dima's "boardgames-vox" MagicaVoxel pack (Pieces/Man/man-v2-{white,red}.vox)
+// instead of a flat CSS background color -- see app/scripts/renderVoxToPng.py
+// for the top-down voxel->PNG renderer that produced
+// public/img/checkers/man-{white,red}.png (these are simple flat-colored
+// rounded tokens in the source pack, no engraved surface detail, so this is
+// real texture-sourced art with the pack's own palette colors, just not a
+// dramatic visual upgrade beyond that). The .checkers-piece div keeps its
+// existing circular border/box-shadow frame and border-radius+overflow
+// clip (see style.css) -- same "<img> tag the same way as chess.js's Phase 5
+// swap" approach, with the king crown now an overlay span instead of the
+// only content.
 (function () {
   const socket = io();
   const app = document.getElementById('app');
   const GAME_TYPE = 'checkers';
+  const PIECE_IMG = { 0: '/img/checkers/man-white.png', 1: '/img/checkers/man-red.png' };
 
   let roomCode = null;
   let playerIdx = null;
@@ -56,7 +70,10 @@
         if (isSelected) cls += ' selected';
         else if (isDest) cls += ' selectable';
 
-        const children = piece ? [el('div', { class: 'checkers-piece p' + piece.owner }, [piece.king ? '♛' : ''])] : [];
+        const children = piece ? [el('div', { class: 'checkers-piece p' + piece.owner }, [
+          el('img', { src: PIECE_IMG[piece.owner], alt: '', class: 'checkers-piece-img' }),
+          piece.king ? el('span', { class: 'checkers-king-badge' }, ['♛']) : null
+        ])] : [];
         grid.appendChild(el('button', {
           class: cls,
           onclick: () => {

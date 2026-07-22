@@ -23,7 +23,19 @@
 
       <div class="ds-eyebrow">/ 03 — Кабінет</div>
       <h1 class="ds-heading">Особистий <span class="ds-heading-gradient mint">кабінет</span></h1>
-      <p class="ds-lede" style="max-width:560px; margin-bottom:36px;">Твій профіль, статистика, баланс та налаштування — все в одному місці.</p>
+      <p class="ds-lede" style="max-width:560px; margin-bottom:20px;">Твій профіль, статистика, баланс та налаштування — все в одному місці.</p>
+
+      <!-- Real quick-nav (2026-07-22 rebuild) -- not a fake CabinetTopbar
+           nav (dima's base44 reference draws 4 inert tab buttons); these are
+           genuine links/in-page anchors, kept as pill tags below the shared
+           .ds-eyebrow/.ds-heading block rather than inside .ds-topbar so
+           every DSLand page keeps the exact same topbar shape. -->
+      <div class="ds-tags" style="margin-bottom:36px;">
+        <a href="/casino.html" class="ds-tag" style="text-decoration:none;">🎰 Казино</a>
+        <a href="/minigames.html" class="ds-tag" style="text-decoration:none;">🕹️ Міні-ігри</a>
+        <a href="#cab-achievements-section" class="ds-tag" style="text-decoration:none;">🏆 Досягнення</a>
+        <a href="#cab-settings-section" class="ds-tag" style="text-decoration:none;">⚙️ Налаштування</a>
+      </div>
 
       <div id="gate-section">
         <div class="ds-panel" style="max-width:420px;">
@@ -42,6 +54,102 @@
         <div id="locked-banner" class="locked-banner" style="display:none; margin-bottom:20px;">
           🔒 Зміна аватарки та нікнейму недоступна під час активної гри.
         </div>
+
+        <!-- ==================== NEW: dashboard (2026-07-22 rebuild) ====================
+             Structure mirrors dima's base44 reference (ProfileHero -> StatGrid ->
+             ActivityChart+Achievements -> ActivityFeed), but every number below is
+             wired to real data from GET /api/profile/:nickname's new `cabinet` block
+             (src/routes/profileRoutes.js -> activityStore.js + src/logic/achievements.js
+             + playersStore.getRank) instead of the reference's hardcoded fake values.
+             Per dima's explicit instruction, the reference's level/XP progress bar and
+             "Енергія" chip are dropped entirely -- this app has no level or energy
+             system, and this hero only shows what's actually real: avatar, nickname,
+             KKoin balance, last-seen. -->
+        <section class="ds-panel cab-hero">
+          <div class="cab-hero-row">
+            <div class="cab-hero-identity">
+              <div id="cab-hero-avatar-wrap" class="cab-hero-avatar-wrap"></div>
+              <div>
+                <h2 id="cab-hero-nickname" class="cab-hero-nickname">—</h2>
+                <p id="cab-hero-lastseen" class="cab-hero-lastseen">Востаннє на сайті: —</p>
+              </div>
+            </div>
+            <div class="cab-hero-balance-chip">
+              <div class="cab-hero-balance-label">
+                <div class="kcoin" style="width:22px; height:22px;">
+                  <div class="kcoin-glow"></div>
+                  <div class="kcoin-inner">
+                    <div class="kcoin-face"><img src="/img/kkrampus-coin.jpg" alt="KKrampus coin"></div>
+                    <div class="kcoin-back"><span style="font-size:9px;">KK</span></div>
+                  </div>
+                </div>
+                Баланс
+              </div>
+              <p id="cab-hero-balance" class="cab-hero-balance-value">0 KKoin</p>
+            </div>
+          </div>
+        </section>
+
+        <div class="cab-stat-grid" id="cab-stat-grid">
+          <div class="cab-stat-card">
+            <div class="cab-stat-icon" style="border-color:var(--turquoise); color:var(--turquoise);">🎮</div>
+            <p class="cab-stat-value" id="cab-stat-games">0</p>
+            <p class="cab-stat-label">Ігор зіграно</p>
+          </div>
+          <div class="cab-stat-card">
+            <div class="cab-stat-icon" style="border-color:#DAA520; color:#DAA520;">🎯</div>
+            <p class="cab-stat-value" id="cab-stat-accuracy">—</p>
+            <p class="cab-stat-label">Точність відповідей</p>
+          </div>
+          <div class="cab-stat-card">
+            <div class="cab-stat-icon" style="border-color:#3B82F6; color:#3B82F6;">🕐</div>
+            <p class="cab-stat-value" id="cab-stat-lastseen">—</p>
+            <p class="cab-stat-label">Востаннє на сайті</p>
+          </div>
+          <div class="cab-stat-card">
+            <div class="cab-stat-icon" style="border-color:#C71585; color:#C71585;">📈</div>
+            <p class="cab-stat-value" id="cab-stat-rank">—</p>
+            <p class="cab-stat-label">Рейтинг за балансом</p>
+          </div>
+        </div>
+
+        <div class="cab-mid-grid">
+          <section class="ds-panel cab-chart-panel">
+            <div class="cab-section-head">
+              <div>
+                <span class="cab-section-eyebrow">/ Активність</span>
+                <h3 class="cab-section-title">Активність за тиждень</h3>
+              </div>
+              <span class="cab-section-note">7 днів</span>
+            </div>
+            <div id="cab-activity-chart" class="cab-activity-chart"></div>
+          </section>
+
+          <section class="ds-panel cab-achievements-panel" id="cab-achievements-section">
+            <div class="cab-section-head">
+              <div>
+                <span class="cab-section-eyebrow">/ Досягнення</span>
+                <h3 class="cab-section-title">Нагороди</h3>
+              </div>
+              <span class="cab-section-note" id="cab-achievements-progress">0 / 0</span>
+            </div>
+            <div class="cab-achievements-grid" id="cab-achievements-grid"></div>
+          </section>
+        </div>
+
+        <section class="ds-panel cab-feed-panel">
+          <div class="cab-section-head">
+            <div>
+              <span class="cab-section-eyebrow">/ Історія</span>
+              <h3 class="cab-section-title">Остання активність</h3>
+            </div>
+          </div>
+          <div id="cab-activity-feed-empty" class="items-empty" style="display:none;">Поки що немає активності. Зіграй у вікторину, Казино чи міні-гру — і тут з'явиться історія.</div>
+          <div id="cab-activity-feed" class="cab-activity-feed"></div>
+        </section>
+
+        <!-- ==================== existing profile controls (unchanged ids) ==================== -->
+        <h2 class="ds-heading" id="cab-settings-section" style="font-size:26px; margin-top:44px; margin-bottom:20px;">Налаштування профілю</h2>
 
         <div class="ds-grid-2">
           <div class="ds-col">

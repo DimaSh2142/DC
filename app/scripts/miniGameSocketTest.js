@@ -113,6 +113,45 @@ async function run() {
   const xIllegal = await x2.trigger('mg:chess_move', { from: 'e8', to: 'e7' });
   assert(!!xIllegal.error, 'chess rejects an illegal move over the socket layer too');
 
+  // ================= Tic-Tac-Toe over the wire =================
+  const t1 = newConnection('tttX');
+  const t2 = newConnection('tttO');
+  const tCreate = await t1.trigger('mg:create_room', { gameType: 'tictactoe', nickname: 'Toma' });
+  const tCode = tCreate.room.code;
+  const tJoin = await t2.trigger('mg:join_room', { gameType: 'tictactoe', roomCode: tCode, nickname: 'Olya' });
+  assert(tJoin.ok && tJoin.room.status === 'playing', 'tic-tac-toe room starts "playing" once both seats are filled');
+
+  const tWrongGameType = await t1.trigger('mg:checkers_move', { from: [2, 1], to: [3, 0] });
+  assert(!!tWrongGameType.error, "a checkers move handler rejects a socket that's actually seated in a tic-tac-toe room");
+
+  const tMove = await t1.trigger('mg:tictactoe_move', { index: 4 }); // X takes center
+  assert(tMove.ok, 'a legal tic-tac-toe move is accepted over the socket layer');
+  const tStateAfter = t2.lastReceived('mg:room_state').gameState;
+  assert(tStateAfter.board[4] === 0 && tStateAfter.turn === 1, "the move and the resulting turn flip are correctly broadcast to the OTHER player's socket");
+
+  const tWrongTurn = await t1.trigger('mg:tictactoe_move', { index: 0 });
+  assert(!!tWrongTurn.error, "tic-tac-toe rejects a move attempt when it isn't that socket's player's turn");
+
+  const tDupCell = await t2.trigger('mg:tictactoe_move', { index: 4 });
+  assert(!!tDupCell.error, 'tic-tac-toe rejects a move onto an already-occupied cell over the socket layer');
+
+  // Play out a full win (X: 0,1,2 top row) to confirm the room-finished +
+  // winnerIdx broadcast path, same shape as the resign test just below.
+  const tO1 = await t2.trigger('mg:tictactoe_move', { index: 3 });
+  assert(tO1.ok, "O's move is accepted");
+  const tX1 = await t1.trigger('mg:tictactoe_move', { index: 0 });
+  assert(tX1.ok, "X's move is accepted");
+  const tO2 = await t2.trigger('mg:tictactoe_move', { index: 5 });
+  assert(tO2.ok, "O's second move is accepted");
+  const tXWin = await t1.trigger('mg:tictactoe_move', { index: 1 }); // X now has 4,0,1 -- not a line yet
+  assert(tXWin.ok, "X's third move is accepted (no line yet: cells 4,0,1)");
+  const tO3 = await t2.trigger('mg:tictactoe_move', { index: 6 });
+  assert(tO3.ok, "O's third move is accepted");
+  const tXFinal = await t1.trigger('mg:tictactoe_move', { index: 2 }); // completes top row 0,1,2
+  assert(tXFinal.ok, "X's winning move (completing the top row 0,1,2) is accepted");
+  const t2StateAfterWin = t2.lastReceived('mg:room_state');
+  assert(t2StateAfterWin.status === 'finished' && t2StateAfterWin.gameState.winnerIdx === 0, "the win + room-finished status is broadcast to the OTHER player's socket, crediting playerIdx 0 (X)");
+
   // ================= resign =================
   const r1 = newConnection('resignA');
   const r2 = newConnection('resignB');

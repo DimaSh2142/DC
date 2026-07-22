@@ -14,7 +14,32 @@ const crypto = require('crypto');
 const express = require('express');
 const config = require('../config');
 const playersStore = require('../state/playersStore');
+const activityStore = require('../state/activityStore');
+const { computeAchievements } = require('../logic/achievements');
 const { normalizeAvatar } = require('../state/roomManager');
+
+// Assembles the "cabinet" block added to GET /:nickname for the 2026-07-22
+// dashboard rebuild -- real recent activity + real 7-day counts (both from
+// activityStore.js), real achievement unlock states (src/logic/achievements.js),
+// and a real KKoin-balance leaderboard rank (playersStore.getRank). Kept as
+// its own function (rather than inlined in the route) so it's one clear spot
+// to see everything the new cabinet UI needs beyond the existing `profile`
+// object, and so a future route/test can call it without an HTTP round-trip.
+function buildCabinetData(profile) {
+  const recentActivity = activityStore.getRecentActivity(profile.nickname, 20);
+  const dailyCounts = activityStore.getDailyCounts(profile.nickname, 7);
+  const achievements = computeAchievements({
+    correct: profile.correct,
+    incorrect: profile.incorrect,
+    gamesPlayed: profile.gamesPlayed,
+    kkoin: profile.kkoin,
+    items: profile.items,
+    bubbleLevel: profile.bubbleLevel,
+    recentActivity
+  });
+  const { rank, total } = playersStore.getRank(profile.nickname);
+  return { recentActivity, dailyCounts, achievements, rank, totalPlayers: total };
+}
 
 // Where "Закинь українізовану SiGame" uploads land -- dima reviews/imports
 // these into themesBank.json by hand later (there's no automated .siq ->
@@ -50,7 +75,8 @@ function buildProfileRouter(roomManager) {
     const profile = playersStore.getProfile(nickname);
     res.json({
       profile,
-      locked: roomManager.isNicknameInActiveGame(nickname)
+      locked: roomManager.isNicknameInActiveGame(nickname),
+      cabinet: buildCabinetData(profile)
     });
   });
 
@@ -141,4 +167,10 @@ function buildProfileRouter(roomManager) {
   return router;
 }
 
-module.exports = { buildProfileRouter };
+// buildCabinetData is exported alongside the router purely for direct unit
+// testing (see scripts/cabinetTest.js) -- this codebase has no HTTP-level
+// test harness (everything else tests pure logic/state modules directly,
+// see e.g. roomManager.js's exported normalizeAvatar), and this is a thin,
+// easily-miswired composition of 4 real data sources that's worth covering
+// without standing up a whole Express request/response fake just for it.
+module.exports = { buildProfileRouter, buildCabinetData };

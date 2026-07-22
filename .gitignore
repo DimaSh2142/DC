@@ -11,6 +11,9 @@ app/data/usedThemes.json
 # but still shouldn't sit in a public repo -- recreated fresh (re-seeding the
 # DimaSh admin account) on first server start, same as the two files above
 app/data/accounts.json
+# per-player activity log (2026-07-22 cabinet rebuild, src/state/activityStore.js)
+# -- same "runtime state, not source" reasoning as the three files above
+app/data/activity.json
 
 # user-submitted SiGame packs ("Закинь українізовану SiGame" button) — may
 # contain copyrighted third-party media, same reasoning as reference/ below;
@@ -21,6 +24,11 @@ app/data/submittedPacks/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Python bytecode cache (renderVoxToPng.py, run ad-hoc for texture rendering,
+# not part of the running app -- see app/scripts/renderVoxToPng.py)
+__pycache__/
+*.pyc
 
 # stray log from local smoke-testing
 app/server_smoke.log

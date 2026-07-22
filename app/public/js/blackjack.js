@@ -1,23 +1,30 @@
-// Блекджек (Blackjack) client -- single player vs the house (the "dealer"),
-// unlike battleship.js/checkers.js/chess.js which are 2-human-player mini-
-// games. All rules/shuffle/dealer-play happen server-side (see
-// src/games/blackjack.js + src/state/blackjackManager.js) -- this file only
-// renders whatever the server's `view` says and never computes hand values
-// or dealer behavior itself, same "server is truth" discipline as the rest
-// of the app (and doubly important here since real KKoin is at stake).
+// Блекджек (Blackjack) client -- TWO modes now (2026-07-22, dima: "зроби щоб
+// блек джек можна було грати з іншими учасниками"):
+//   - solo: single player vs the house (the "dealer"). Unchanged since first
+//     ship -- see src/games/blackjack.js + src/state/blackjackManager.js.
+//   - table: a shared table, 2-6 human seats, one shared dealer sequence.
+//     See src/games/blackjackTable.js + src/state/blackjackTableManager.js.
+// Both are entered from the same mode-select screen below; nothing about the
+// solo screen's markup/classes/copy changed, it's just now reached via a
+// click instead of being the only thing this page could ever show.
 //
-// Visual design ported 1:1 from dima's base44 reference
+// All rules/shuffle/dealer-play happen server-side either way -- this file
+// only renders whatever the server's `view`/`table` state says and never
+// computes hand values or dealer behavior itself, same "server is truth"
+// discipline as the rest of the app (and doubly important here since real
+// KKoin is at stake).
+//
+// Solo visual design ported 1:1 from dima's base44 reference
 // (src/pages/Blackjack.jsx + components/blackjack/{PlayingCard,DealerAvatar}.jsx
 // in the "6a5fd3917e81c2e03dba4d9a (1).zip" export, 2026-07-22) -- exact
-// colors/copy/layout, hand-translated from React+Tailwind+Framer Motion into
-// this app's plain el()/CSS conventions. One deliberate deviation: the
-// reference's fixed bet buttons (50/100/250 "монет") are replaced with
-// presets computed from the player's REAL KKoin balance (this app's amounts
-// are much smaller/more varied than the reference's placeholder economy),
-// plus a custom-amount input.
+// colors/copy/layout. The table mode has no reference design (the base44
+// export never had a multiplayer table) -- it reuses the same bj-* visual
+// language (cards, dealer ring, coin chip) plus new bjt-* classes for the
+// seats row, kept in the same dark casino aesthetic.
 (function () {
   const socket = io();
   const app = document.getElementById('app');
+  const TABLE_STORAGE_KEY = 'bj_table_code';
 
   const DEALER_STATUS = {
     idle: { label: 'Очікую гравця', color: '#666666' },
@@ -37,9 +44,17 @@
   const SUIT_COLOR = { '♠': 'var(--hub-text, #E5E5E5)', '♣': 'var(--hub-text, #E5E5E5)', '♥': '#FF3B5C', '♦': '#FF3B5C' };
 
   let nickname = null;
+  let mode = null; // null (mode-select) | 'solo' | 'table'
+
+  // ---- solo mode state ----
   let view = null; // latest server view, or null if no active hand
   let balance = 0;
   let customBet = '';
+
+  // ---- table mode state ----
+  let tableCode = null;
+  let tableState = null; // latest casino:table_state broadcast (or the table returned by create/join)
+  let tableBetDraft = '';
 
   function computeDealerState() {
     if (!view) return 'idle';
@@ -60,38 +75,86 @@
     }).catch(() => { if (cb) cb(); });
   }
 
-  function cardNode(card, hidden, delayIndex) {
+  // extraClass lets the table view reuse the exact same card visuals at a
+  // smaller size (bj-card-sm, see style.css) for a row of up to 6 hands.
+  function cardNode(card, hidden, delayIndex, extraClass) {
+    const cls = 'bj-card' + (extraClass ? ' ' + extraClass : '');
     if (hidden) {
-      return el('div', { class: 'bj-card bj-card-back', style: 'animation-delay:' + (delayIndex * 0.12) + 's;' }, [
+      return el('div', { class: cls + ' bj-card-back', style: 'animation-delay:' + (delayIndex * 0.12) + 's;' }, [
         el('span', { class: 'bj-card-back-mark' }, ['DS'])
       ]);
     }
     const color = SUIT_COLOR[card.suit] || 'var(--hub-text, #E5E5E5)';
-    return el('div', { class: 'bj-card', style: 'animation-delay:' + (delayIndex * 0.12) + 's;' }, [
+    return el('div', { class: cls, style: 'animation-delay:' + (delayIndex * 0.12) + 's;' }, [
       el('div', { class: 'bj-card-corner bj-card-corner-tl', style: 'color:' + color + ';' }, [card.rank, el('span', {}, [card.suit])]),
       el('div', { class: 'bj-card-corner bj-card-corner-br', style: 'color:' + color + ';' }, [card.rank, el('span', {}, [card.suit])]),
       el('div', { class: 'bj-card-center', style: 'color:' + color + ';' }, [card.suit])
     ]);
   }
 
-  function render() {
-    clear(app);
-    const dState = computeDealerState();
-    const dInfo = DEALER_STATUS[dState] || DEALER_STATUS.idle;
-
-    const topBar = el('div', { class: 'bj-topbar' }, [
-      el('a', { href: '/casino.html', class: 'back-link' }, ['← Казино']),
+  function topBarNode(showModeSwitch) {
+    const left = [el('a', { href: '/casino.html', class: 'back-link' }, ['← Казино'])];
+    if (showModeSwitch) {
+      left.push(el('button', {
+        class: 'btn-small btn-outline', style: 'margin-left:10px; padding:6px 12px; font-size:10px;',
+        onclick: () => { mode = null; tableState = null; render(); }
+      }, ['🔁 Інший режим']));
+    }
+    return el('div', { class: 'bj-topbar', style: 'display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;' }, [
+      el('div', { style: 'display:flex; align-items:center;' }, left),
       el('div', { class: 'bj-coin-chip' }, [
         el('span', { class: 'bj-coin-icon' }, ['\u{1FA99}']),
         el('span', { class: 'bj-coin-value' }, [String(balance)]),
         el('span', { class: 'bj-coin-label' }, ['KKoin'])
       ])
     ]);
+  }
 
-    const titleBlock = el('div', { class: 'bj-title-block' }, [
+  function titleBlockNode(subtitle) {
+    return el('div', { class: 'bj-title-block' }, [
       el('div', { class: 'bj-eyebrow' }, ['/ Казино · 21']),
-      el('h1', { class: 'bj-title' }, ['Блекджек'])
+      el('h1', { class: 'bj-title' }, ['Блекджек' + (subtitle ? ' — ' + subtitle : '')])
     ]);
+  }
+
+  function render() {
+    clear(app);
+    if (mode === 'table') return renderTableScreen();
+    if (mode === 'solo') return renderSoloScreen();
+    renderModeSelect();
+  }
+
+  // ================= mode select =================
+  function renderModeSelect() {
+    const grid = el('div', { class: 'bj-mode-grid' }, [
+      el('div', { class: 'bj-mode-card', onclick: enterSolo }, [
+        el('div', { class: 'bj-mode-card-icon' }, ['♠️']),
+        el('div', { class: 'bj-mode-card-title' }, ['Проти дилера']),
+        el('div', { class: 'bj-mode-card-desc' }, ['Класичний соло-раунд 1 на 1 проти дилера будинку.'])
+      ]),
+      el('div', { class: 'bj-mode-card', onclick: enterTableMode }, [
+        el('div', { class: 'bj-mode-card-icon' }, ['👥']),
+        el('div', { class: 'bj-mode-card-title' }, ['За столом з друзями']),
+        el('div', { class: 'bj-mode-card-desc' }, ['Спільний стіл на 2-6 гравців, одна колода, один дилер на всіх, черга ходів.'])
+      ])
+    ]);
+    app.appendChild(el('div', { class: 'ds-page bj-page' }, [
+      el('div', { class: 'ds-shell' }, [topBarNode(false), titleBlockNode(null), grid])
+    ]));
+  }
+
+  // ================= solo mode (unchanged behavior) =================
+  function enterSolo() {
+    mode = 'solo';
+    socket.emit('casino:blackjack_state', { nickname }, (res) => {
+      if (res && res.ok && res.view) view = res.view;
+      render();
+    });
+  }
+
+  function renderSoloScreen() {
+    const dState = computeDealerState();
+    const dInfo = DEALER_STATUS[dState] || DEALER_STATUS.idle;
 
     const dealerCards = view ? view.dealer.map((c, i) => cardNode(c, false, i)) : [];
     if (view && view.dealerHasHiddenCard) {
@@ -136,14 +199,14 @@
       resultBanner
     ]);
 
-    const controls = el('div', { class: 'bj-controls' }, [renderControls()]);
+    const controls = el('div', { class: 'bj-controls' }, [renderSoloControls()]);
 
     app.appendChild(el('div', { class: 'ds-page bj-page' }, [
-      el('div', { class: 'ds-shell' }, [topBar, titleBlock, table, controls])
+      el('div', { class: 'ds-shell' }, [topBarNode(true), titleBlockNode('соло'), table, controls])
     ]));
   }
 
-  function renderControls() {
+  function renderSoloControls() {
     if (!view) {
       // bet screen. dima 2026-07-22: "по базі ще хай буде ставка 1, 5, 10" --
       // fixed round presets (not %-of-balance like before, which produced
@@ -213,13 +276,233 @@
     ]);
   }
 
+  // ================= table mode =================
+  function enterTableMode() {
+    mode = 'table';
+    tableState = null;
+    render();
+  }
+
+  function doCreateTable() {
+    socket.emit('casino:table_create', { nickname }, (res) => {
+      if (res.error) return toast(res.error, true);
+      tableCode = res.table.code;
+      tableState = res.table;
+      localStorage.setItem(TABLE_STORAGE_KEY, tableCode);
+      render();
+    });
+  }
+
+  function doJoinTable(code) {
+    socket.emit('casino:table_join', { roomCode: code, nickname }, (res) => {
+      if (res.error) return toast(res.error, true);
+      tableCode = res.table.code;
+      tableState = res.table;
+      localStorage.setItem(TABLE_STORAGE_KEY, tableCode);
+      render();
+    });
+  }
+
+  function renderTableScreen() {
+    if (!tableState) return renderTableJoinScreen();
+    if (tableState.status === 'lobby') return renderTableLobby();
+    return renderTablePlayOrResult();
+  }
+
+  function renderTableJoinScreen() {
+    const codeInput = el('input', { type: 'text', placeholder: 'Код столу', maxlength: '8', style: 'text-transform:uppercase; letter-spacing:3px; font-weight:700;' });
+    const panel = el('div', { class: 'ds-panel', style: 'max-width:440px; margin:18px auto 0;' }, [
+      el('p', { style: 'color:var(--ds-text-dim); font-size:13px; line-height:1.6; margin-top:0;' }, [
+        'Грайте Блекджек за одним столом із друзями (2-6 гравців) — спільна колода, один дилер на всіх, кожен ходить по черзі.'
+      ]),
+      el('div', { style: 'display:flex; flex-direction:column; gap:14px;' }, [
+        el('button', { class: 'btn-small', style: 'width:100%;', onclick: doCreateTable }, ['➕ Створити новий стіл']),
+        el('div', { style: 'display:flex; gap:8px; align-items:flex-end;' }, [
+          el('div', { style: 'flex:1;' }, [el('label', {}, ['Або приєднатись за кодом']), codeInput]),
+          el('button', { class: 'btn-small btn-outline', onclick: () => {
+            const c = codeInput.value.trim().toUpperCase();
+            if (!c) return toast('Вкажіть код столу', true);
+            doJoinTable(c);
+          } }, ['Приєднатись'])
+        ])
+      ])
+    ]);
+    app.appendChild(el('div', { class: 'ds-page bj-page' }, [
+      el('div', { class: 'ds-shell' }, [topBarNode(true), titleBlockNode('за столом'), panel])
+    ]));
+  }
+
+  function mySeat() {
+    if (!tableState) return null;
+    return tableState.seats.find(s => s.nickname.trim().toLowerCase() === (nickname || '').trim().toLowerCase()) || null;
+  }
+
+  function renderTableLobby() {
+    const seatRows = tableState.seats.map((s) => {
+      const isMe = mySeat() === s;
+      return el('div', { class: 'bjt-lobby-row' + (isMe ? ' me' : '') + (s.connected ? '' : ' offline') }, [
+        avatarEl(s, 30),
+        el('span', { class: 'bjt-lobby-row-name' }, [s.nickname + (isMe ? ' (ти)' : '') + (s.connected ? '' : ' · офлайн')]),
+        el('span', { class: 'bjt-lobby-row-bet' + (s.pendingBet > 0 ? '' : ' none') }, [s.pendingBet > 0 ? ('\u{1FA99} ' + s.pendingBet) : 'без ставки']),
+      ]);
+    });
+
+    const me = mySeat();
+    const betInput = el('input', { type: 'number', min: '1', max: String(Math.max(0, Math.floor(balance))), placeholder: 'Ставка', value: tableBetDraft, style: 'max-width:110px;',
+      oninput: (e) => { tableBetDraft = e.target.value; },
+      onkeydown: (e) => { if (e.key === 'Enter') doPlaceBet(); }
+    });
+    function doPlaceBet() {
+      const stake = Math.max(1, Math.floor(Number(tableBetDraft) || 0));
+      if (stake > balance) return toast('Недостатньо KKoin для такої ставки', true);
+      socket.emit('casino:table_bet', { stake }, (res) => { if (res && res.error) toast(res.error, true); else tableBetDraft = ''; });
+    }
+    function doClearBet() {
+      socket.emit('casino:table_bet', { stake: 0 }, (res) => { if (res && res.error) toast(res.error, true); });
+    }
+    const bettingCount = tableState.seats.filter(s => s.pendingBet > 0).length;
+    const canDeal = bettingCount >= 2;
+
+    const panel = el('div', { class: 'ds-panel', style: 'max-width:520px; margin:18px auto 0;' }, [
+      el('div', { style: 'display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;' }, [
+        el('div', { class: 'ds-panel-label', style: 'margin:0;' }, ['Стіл ', el('span', { class: 'room-code', style: 'font-size:16px; padding:2px 10px;' }, [tableState.code])]),
+        el('button', { class: 'btn-small btn-outline crimson', style: 'padding:6px 12px; font-size:10px;', onclick: () => {
+          socket.emit('casino:table_leave', {}, (res) => {
+            if (res && res.error) return toast(res.error, true);
+            localStorage.removeItem(TABLE_STORAGE_KEY);
+            tableCode = null; tableState = null; mode = null;
+            render();
+          });
+        } }, ['Вийти'])
+      ]),
+      el('p', { style: 'font-size:12px; color:var(--ds-text-dim);' }, ['Надішли цей код друзям, щоб вони приєдналися. Кожен ставить свою суму, потім будь-хто тисне «Здати карти».']),
+      el('div', { class: 'bjt-lobby-players' }, seatRows),
+      me ? el('div', { class: 'bjt-bet-row' }, [
+        betInput,
+        el('button', { class: 'btn-small', onclick: doPlaceBet }, [me.pendingBet > 0 ? 'Змінити ставку' : 'Поставити']),
+        me.pendingBet > 0 ? el('button', { class: 'btn-small btn-outline', onclick: doClearBet }, ['Не грати цю роздачу']) : null
+      ]) : null,
+      el('div', { style: 'text-align:center; margin-top:18px;' }, [
+        el('button', {
+          class: 'bj-deal-btn', disabled: canDeal ? null : 'disabled',
+          onclick: () => { socket.emit('casino:table_start', {}, (res) => { if (res && res.error) toast(res.error, true); }); }
+        }, ['Здати карти' + (canDeal ? '' : ' (потрібно ≥2 ставки)')])
+      ])
+    ]);
+    app.appendChild(el('div', { class: 'ds-page bj-page' }, [
+      el('div', { class: 'ds-shell' }, [topBarNode(true), titleBlockNode('за столом · лобі'), panel])
+    ]));
+  }
+
+  function renderTablePlayOrResult() {
+    const isResult = tableState.status === 'result';
+    const dealerCards = tableState.dealer.map((c, i) => cardNode(c, false, i, 'bj-card-sm'));
+    if (tableState.dealerHasHiddenCard) dealerCards.push(cardNode(null, true, dealerCards.length, 'bj-card-sm'));
+    const dealerColor = isResult ? '#00FFD1' : '#DAA520';
+    const dealerBlock = el('div', { class: 'bj-side' }, [
+      el('div', { class: 'bj-dealer' }, [
+        el('div', { class: 'bj-dealer-ring', style: 'width:64px; height:64px; border-color:' + dealerColor + ';' }, [
+          el('div', { class: 'bj-dealer-core', style: 'width:52px; height:52px; border-color:' + dealerColor + ';' }, [
+            el('span', { class: 'bj-dealer-spade', style: 'font-size:22px; color:' + dealerColor + ';' }, ['♠'])
+          ])
+        ]),
+        el('div', { class: 'bj-dealer-status' }, [
+          el('span', { class: 'bj-dealer-dot', style: 'background:' + dealerColor + ';' }),
+          el('span', { style: 'color:' + dealerColor + ';' }, ['Дилер' + (isResult ? '' : ' · грає стіл')])
+        ])
+      ]),
+      el('div', { class: 'bj-cards-row', style: 'min-height:90px;' }, dealerCards),
+      tableState.dealer.length ? el('div', { class: 'bj-hand-label' }, ['Дилер: ', el('span', { class: 'bj-hand-value' }, [tableState.dealerHasHiddenCard ? '?' : String(tableState.dealerValue)])]) : null
+    ]);
+
+    const turnSeat = tableState.status === 'playing' ? tableState.seats[tableState.turnIdx] : null;
+    const seatNodes = tableState.seats.filter(s => s.inRound).map((s) => {
+      const isMe = mySeat() === s;
+      const isTurn = turnSeat === s;
+      const cards = s.hand.map((c, i) => cardNode(c, false, i, 'bj-card-sm'));
+      let statusText = '';
+      let statusCls = '';
+      if (s.result) {
+        statusText = s.result === 'win' ? 'Перемога' : s.result === 'lose' ? 'Програш' : s.result === 'push' ? 'Нічия' : 'Перебір';
+        statusCls = s.result;
+      } else if (isTurn) statusText = 'Хід…';
+      else if (s.done) statusText = 'Стоп';
+      else statusText = 'Очікує';
+      return el('div', { class: 'bjt-seat' + (isTurn ? ' active-turn' : '') + (isMe ? ' is-me' : '') + (s.connected ? '' : ' offline') }, [
+        avatarEl(s, 34),
+        el('div', { class: 'bjt-seat-name' }, [s.nickname + (isMe ? ' (ти)' : '')]),
+        el('div', { class: 'bjt-seat-cards' }, cards),
+        el('div', { class: 'bjt-seat-value' }, [s.hand.length ? String(s.handValue) : '']),
+        el('div', { class: 'bjt-seat-bet' }, ['\u{1FA99} ' + s.pendingBet]),
+        el('div', { class: 'bjt-seat-status' + (statusCls ? ' ' + statusCls : '') }, [statusText])
+      ]);
+    });
+
+    const me = mySeat();
+    const myTurn = !!(turnSeat && me && turnSeat === me);
+    let controls;
+    if (isResult) {
+      controls = el('div', { class: 'bj-newround-block' }, [
+        el('button', { class: 'bj-deal-btn', onclick: () => { socket.emit('casino:table_new_round', {}, (res) => { if (res && res.error) toast(res.error, true); refreshBalance(); }); } }, ['\u{1F501} Нова роздача'])
+      ]);
+    } else if (myTurn) {
+      controls = el('div', { class: 'bj-action-row' }, [
+        el('button', { class: 'bj-action-btn bj-action-hit', onclick: () => {
+          socket.emit('casino:table_hit', {}, (res) => { if (res && res.error) toast(res.error, true); else playSfx('move'); });
+        } }, ['Ще карту']),
+        el('button', { class: 'bj-action-btn bj-action-stand', onclick: () => {
+          socket.emit('casino:table_stand', {}, (res) => { if (res && res.error) toast(res.error, true); });
+        } }, ['Стоп'])
+      ]);
+    } else {
+      controls = el('div', { class: 'bj-waiting-label' }, [turnSeat ? ('Хід гравця: ' + turnSeat.nickname + '…') : 'Дилер грає…']);
+    }
+
+    const panel = [
+      dealerBlock,
+      el('div', { class: 'bjt-seats-row' }, seatNodes),
+      el('div', { class: 'bj-controls' }, [controls])
+    ];
+    app.appendChild(el('div', { class: 'ds-page bj-page' }, [
+      el('div', { class: 'ds-shell' }, [topBarNode(false), titleBlockNode('стіл · ' + tableState.code), ...panel])
+    ]));
+
+    // refresh the coin chip once a round pays out -- balance itself lives in
+    // playersStore, not the table broadcast, so it needs its own fetch.
+    if (isResult && !renderTablePlayOrResult._settledOnce) {
+      renderTablePlayOrResult._settledOnce = true;
+      refreshBalance(() => { const chip = app.querySelector('.bj-coin-value'); if (chip) chip.textContent = String(balance); });
+    }
+    if (!isResult) renderTablePlayOrResult._settledOnce = false;
+  }
+
+  socket.on('casino:table_state', (state) => {
+    if (!tableCode || state.code !== tableCode) return;
+    tableState = state;
+    if (mode === 'table') render();
+  });
+
+  socket.on('connect', () => {
+    if (mode === 'table' && tableCode) {
+      socket.emit('casino:table_reconnect', { roomCode: tableCode, nickname }, (res) => {
+        if (res && res.ok) { tableState = res.table; render(); }
+      });
+    }
+  });
+
   requireAccount(app, { title: 'Блекджек', emoji: '♠️' }, (login) => {
     nickname = login;
     refreshBalance(() => {
-      socket.emit('casino:blackjack_state', { nickname }, (res) => {
-        if (res && res.ok && res.view) view = res.view;
+      const storedTable = localStorage.getItem(TABLE_STORAGE_KEY);
+      if (storedTable) {
+        socket.emit('casino:table_reconnect', { roomCode: storedTable, nickname }, (res) => {
+          if (res && res.ok) { mode = 'table'; tableCode = res.table.code; tableState = res.table; }
+          else localStorage.removeItem(TABLE_STORAGE_KEY);
+          render();
+        });
+      } else {
         render();
-      });
+      }
     });
   });
 })();

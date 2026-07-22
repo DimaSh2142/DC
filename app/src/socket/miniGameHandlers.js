@@ -151,6 +151,19 @@ function registerMiniGameHandlers(io, { miniGameManager }) {
       if (cb) cb({ ok: true, captured: result.captured });
     }));
 
+    // ---------- Tic-Tac-Toe ----------
+    socket.on('mg:tictactoe_move', safe(async (payload, cb) => {
+      const { room, idx } = currentRoomAndIdx(socket);
+      if (!room || idx === -1 || idx === undefined) return cb && cb({ error: 'Ви не в кімнаті' });
+      if (room.gameType !== 'tictactoe') return cb && cb({ error: 'Невірний тип гри' });
+      const tictactoe = miniGameManager.module(room);
+      const result = tictactoe.applyMove(room.gameState, idx, payload && payload.index);
+      if (result.error) return cb && cb({ error: result.error });
+      miniGameManager.applyModuleResult(room, result);
+      broadcastRoomState(room);
+      if (cb) cb({ ok: true });
+    }));
+
     // ---------- shared ----------
     socket.on('mg:resign', safe(async (payload, cb) => {
       const { room, idx } = currentRoomAndIdx(socket);

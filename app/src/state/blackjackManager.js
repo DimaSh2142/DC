@@ -17,6 +17,15 @@
 
 const playersStore = require('./playersStore');
 const blackjack = require('../games/blackjack');
+// Optional-require + try/catch guard, same pattern as blackjackTableManager.js
+// /rouletteTableManager.js/plinkoManager.js -- 2026-07-22 cabinet rebuild
+// wiring real data into ActivityFeed/ActivityChart for solo Blackjack too.
+let activityStore = null;
+try { activityStore = require('./activityStore'); } catch (e) { /* optional, see logActivity() below */ }
+function logActivity(nickname, entry) {
+  if (!activityStore) return;
+  try { activityStore.logActivity(nickname, entry); } catch (e) { /* best-effort only */ }
+}
 
 class BlackjackManager {
   constructor() {
@@ -66,6 +75,15 @@ class BlackjackManager {
     entry.state.settled = true;
     const mult = blackjack.payoutMultiplier(entry.state.result);
     if (mult > 0) playersStore.addKkoin(entry.nickname, entry.state.stake * mult);
+    // Same "win only true on mult>1" convention as blackjackTableManager.js's
+    // identical logActivity call for the multiplayer table variant.
+    const netLine = mult === 0 ? ('-' + entry.state.stake) : (mult === 1 ? '+0 (push)' : ('+' + entry.state.stake * (mult - 1)));
+    logActivity(entry.nickname, {
+      label: 'Казино · Блекджек',
+      detail: (entry.state.result === 'win' ? 'Виграш' : entry.state.result === 'push' ? 'Нічия' : entry.state.result === 'bust' ? 'Перебір' : 'Програш') + ' · ' + netLine + ' KKoin',
+      accent: mult > 1 ? '#00FFD1' : (mult === 1 ? '#666666' : '#C71585'),
+      win: mult > 1
+    });
   }
 
   currentView(nickname) {

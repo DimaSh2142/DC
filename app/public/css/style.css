@@ -1012,9 +1012,24 @@ input[type="range"] {
   font-size: 16px;
   font-weight: 800;
   box-shadow: 0 2px 6px rgba(0,0,0,.35);
+  position: relative;
+  overflow: hidden; /* clips the (roughly-but-not-perfectly round) voxel-rendered sprite to a clean circle */
 }
+/* background: solid color kept as a fallback (matches the pre-2026-07-22
+   texture pass) in case the image is slow/fails to load -- the sprite
+   normally fully covers it. */
 .checkers-piece.p0 { background: var(--white); color: var(--turquoise-ink); border: 2px solid var(--turquoise-dark); }
 .checkers-piece.p1 { background: var(--crimson); color: var(--white); border: 2px solid var(--crimson-dark); }
+.checkers-piece-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; padding: 2px; box-sizing: border-box;
+  image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;
+  pointer-events: none;
+}
+.checkers-king-badge {
+  position: relative; z-index: 1;
+  color: #FFD700; text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 6px rgba(0,0,0,.7);
+}
 
 .chess-grid {
   display: grid;
@@ -1038,6 +1053,53 @@ input[type="range"] {
 .chess-cell.selectable { box-shadow: inset 0 0 0 3px var(--orange); }
 .chess-cell.selected { box-shadow: inset 0 0 0 3px var(--crimson); }
 .chess-cell.last-move { box-shadow: inset 0 0 0 3px var(--turquoise); }
+
+/* ---- Tic-Tac-Toe (2026-07-22, 4th mini-game) -- reuses the same
+   selectable/win highlight language as checkers/chess above. X/O marks are
+   voxel-rendered tile sprites (app/scripts/renderVoxToPng.py, same pipeline
+   as the checkers pieces) rather than plain text glyphs. ---- */
+.ttt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 96px));
+  grid-template-rows: repeat(3, minmax(0, 96px));
+  gap: 6px;
+  border: 3px solid var(--turquoise-dark);
+  border-radius: 12px;
+  padding: 6px;
+  background: var(--turquoise-dark);
+}
+.ttt-cell {
+  background: var(--turquoise-light);
+  border: none; border-radius: 8px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.ttt-cell:disabled { cursor: default; }
+.ttt-cell.selectable { box-shadow: inset 0 0 0 3px var(--orange); }
+.ttt-cell.win-line { box-shadow: inset 0 0 0 3px var(--crimson); background: rgba(215,38,61,.18); }
+.ttt-mark-img {
+  width: 72%; height: 72%; object-fit: contain;
+  image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;
+  pointer-events: none;
+}
+@media (max-width: 640px) {
+  .ttt-grid { grid-template-columns: repeat(3, minmax(0, 78px)); grid-template-rows: repeat(3, minmax(0, 78px)); }
+}
+
+/* ---- chess piece sprites (2026-07-22 texture swap, "simple-chess-skyel"
+   pack) -- source art is tiny (~12-14px wide), scaled up with pixelated
+   rendering so it reads as crisp pixel art instead of a blurry upscale.
+   height:auto preserves each piece's own native aspect ratio (pawns are
+   shorter than queens/kings in the source pack, a fixed square would
+   squash them). pointer-events:none so clicks still land on the parent
+   .chess-cell button, never swallowed by the image itself. ---- */
+.chess-piece-img {
+  width: 36px; height: auto;
+  image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.45));
+}
+@media (max-width: 640px) { .chess-piece-img { width: 28px; } }
 
 /* ---- .btn-12 (dima 2026-07-21, наданий verbatim CSS-компонент) -------------
    Застосовано до кнопки "Я готовий(ва)" у player.js (renderReadyCheck()) --
@@ -1358,6 +1420,75 @@ input[type="range"] {
 .admin-selected-label { font-size: 12px; font-weight: 700; color: var(--turquoise); margin-bottom: 10px; min-height: 16px; }
 
 /* ============================================================================
+   Особистий кабінет -- dashboard rebuild (2026-07-22), styled from dima's
+   base44 reference (components/cabinet/*.jsx) but using this site's own
+   .ds-panel/--ds-* dark-cabinet system instead of literal Tailwind classes
+   (this project has no build step / no Tailwind). Every number these
+   sections display is wired to real data -- see profile.js's cabinet
+   rendering block and src/routes/profileRoutes.js's `cabinet` response key.
+   Per dima's explicit instruction, there is NO level/XP progress bar and NO
+   "Енергія" chip anywhere here (the reference hero has both) -- this app has
+   neither concept, and showing fake versions of either would be exactly the
+   kind of dishonest placeholder data this whole rebuild was meant to remove.
+   ============================================================================ */
+.cab-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.cab-hero-identity { display: flex; align-items: center; gap: 18px; }
+.cab-hero-avatar-wrap { flex: none; }
+.cab-hero-avatar-wrap .avatar-circle { width: 68px; height: 68px; border: 2px solid var(--ds-border); }
+.cab-hero-nickname { font-size: 24px; font-weight: 900; color: var(--ds-text); margin: 0; letter-spacing: -.2px; }
+.cab-hero-lastseen { font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--ds-text-dimmer); margin: 6px 0 0; text-transform: uppercase; }
+.cab-hero-balance-chip { border: 1.5px solid var(--ds-border); background: var(--ds-surface-strong); border-radius: 14px; padding: 12px 20px; }
+.cab-hero-balance-label { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ds-text-dimmer); }
+.cab-hero-balance-value { font-size: 22px; font-weight: 900; color: var(--ds-mint); margin: 6px 0 0; }
+
+.cab-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 20px 0; }
+.cab-stat-card { background: var(--ds-surface); border: 1.5px solid var(--ds-border); border-radius: 16px; padding: 18px; transition: border-color .15s ease; }
+.cab-stat-card:hover { border-color: var(--ds-text-dimmer); }
+.cab-stat-icon { width: 38px; height: 38px; border-radius: 10px; border: 1.5px solid; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+.cab-stat-value { font-size: 24px; font-weight: 900; color: var(--ds-text); margin: 14px 0 0; }
+.cab-stat-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--ds-text-dimmer); margin: 2px 0 0; }
+@media (max-width: 760px) {
+  .cab-stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.cab-mid-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px; align-items: stretch; }
+@media (max-width: 900px) {
+  .cab-mid-grid { grid-template-columns: 1fr; }
+}
+.cab-section-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 18px; gap: 10px; flex-wrap: wrap; }
+.cab-section-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase; color: var(--turquoise); }
+.cab-section-title { font-size: 19px; font-weight: 800; color: var(--ds-text); margin: 6px 0 0; }
+.cab-section-note { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--ds-text-dimmer); white-space: nowrap; }
+
+/* ---- activity chart: hand-rolled inline SVG (no chart library in this
+   vanilla-JS project) built by profile.js from real activityStore.getDailyCounts()
+   -- a flat all-zero week for a brand new profile is an honest chart, not a
+   special-cased empty state. ---- */
+.cab-activity-chart { height: 180px; width: 100%; }
+.cab-activity-chart svg { width: 100%; height: 100%; overflow: visible; }
+.cab-activity-chart .cab-chart-day-label { font: 700 10px ui-monospace, monospace; fill: var(--ds-text-dimmer); text-transform: uppercase; }
+.cab-activity-chart .cab-chart-dot { fill: var(--turquoise); }
+.cab-activity-chart .cab-chart-value { font: 800 10px ui-monospace, monospace; fill: var(--ds-text-dim); }
+
+.cab-achievements-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.cab-achievement-card { border-radius: 12px; padding: 14px; border: 1.5px solid var(--ds-border); background: var(--ds-surface-strong); transition: border-color .15s ease, opacity .15s ease; }
+.cab-achievement-card.locked { opacity: .38; }
+.cab-achievement-card:not(.locked):hover { border-color: var(--ds-text-dimmer); }
+.cab-achievement-icon { width: 34px; height: 34px; border-radius: 9px; border: 1.5px solid; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.cab-achievement-title { font-size: 12px; font-weight: 800; color: var(--ds-text); margin: 10px 0 0; }
+.cab-achievement-desc { font-size: 10.5px; line-height: 1.4; color: var(--ds-text-dimmer); margin: 3px 0 0; }
+
+.cab-activity-feed { display: flex; flex-direction: column; }
+.cab-feed-row { display: flex; align-items: center; gap: 14px; padding: 12px 6px; border-bottom: 1px solid var(--ds-border); }
+.cab-feed-row:last-child { border-bottom: none; }
+.cab-feed-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.cab-feed-body { flex: 1; min-width: 0; }
+.cab-feed-label { font-size: 13px; font-weight: 800; color: var(--ds-text); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cab-feed-detail { font-size: 11.5px; color: var(--ds-text-dim); margin: 2px 0 0; }
+.cab-feed-row.is-loss .cab-feed-detail { color: var(--ds-text-dimmer); }
+.cab-feed-time { font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ds-text-dimmer); white-space: nowrap; flex: none; }
+
+/* ============================================================================
    KKrampus coin -- справжня 3D монета-переверталка (2026-07-21, dima дав
    вихідний код React-компонента KrampusCoin.jsx з base44-сайту, адаптовано
    тут у чистий HTML/CSS, бо в цьому проєкті немає React). Той самий підхід,
@@ -1547,3 +1678,104 @@ body.ds-dark-body .room-code { color: #ff5c72; }
   .bj-dealer-ring { width: 76px; height: 76px; }
   .bj-dealer-core { width: 64px; height: 64px; }
 }
+
+/* ---- Blackjack: shared multiplayer TABLE mode (2026-07-22, dima: "зроби
+   щоб блек джек можна було грати з іншими учасниками") -- additive on top
+   of the .bj-* solo styles above, never overriding them (solo mode is
+   untouched). Smaller card variant for a seats row where up to 6 hands
+   need to fit side by side. ---- */
+.bj-mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 640px; margin: 18px auto 0; }
+@media (max-width: 560px) { .bj-mode-grid { grid-template-columns: 1fr; } }
+.bj-mode-card {
+  display: block; text-align: center; padding: 28px 20px; border-radius: 16px;
+  border: 1.5px solid var(--ds-border); background: var(--ds-surface); cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.bj-mode-card:hover { border-color: #00FFD1; transform: translateY(-3px); }
+.bj-mode-card-icon { font-size: 34px; margin-bottom: 10px; }
+.bj-mode-card-title { font-size: 17px; font-weight: 800; color: var(--ds-text); margin-bottom: 6px; }
+.bj-mode-card-desc { font-size: 12px; color: var(--ds-text-dim); line-height: 1.5; }
+
+.bjt-lobby-players { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.bjt-lobby-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid var(--ds-border); }
+.bjt-lobby-row.me { border-color: #00FFD1; }
+.bjt-lobby-row-name { flex: 1; font-weight: 700; font-size: 13px; color: var(--ds-text); }
+.bjt-lobby-row-bet { font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; color: #DAA520; }
+.bjt-lobby-row-bet.none { color: var(--ds-text-dimmer); font-weight: 500; }
+.bjt-lobby-row.offline { opacity: .45; }
+.bjt-bet-row { display: flex; align-items: center; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+
+.bjt-seats-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin: 22px 0; }
+.bjt-seat {
+  width: 132px; border-radius: 14px; border: 1.5px solid var(--ds-border); background: rgba(255,255,255,.02);
+  padding: 12px 8px; text-align: center; transition: border-color .2s ease, box-shadow .2s ease;
+}
+.bjt-seat.active-turn { border-color: #00FFD1; box-shadow: 0 0 22px rgba(0,255,209,.25); }
+.bjt-seat.is-me { background: rgba(0,255,209,.05); }
+.bjt-seat.offline { opacity: .45; }
+.bjt-seat-name { font-size: 11px; font-weight: 800; color: var(--ds-text); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bjt-seat-cards { display: flex; justify-content: center; gap: 2px; min-height: 78px; align-items: flex-end; flex-wrap: wrap; margin: 8px 0; }
+.bjt-seat-value { font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; color: var(--ds-text-dim); }
+.bjt-seat-status { margin-top: 6px; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--ds-text-dimmer); }
+.bjt-seat-status.win { color: #00FFD1; }
+.bjt-seat-status.lose, .bjt-seat-status.bust { color: #C71585; }
+.bjt-seat-status.push { color: #DAA520; }
+.bjt-seat-bet { font-family: ui-monospace, monospace; font-size: 11px; color: #DAA520; margin-top: 2px; }
+
+.bj-card-sm { width: 44px; height: 62px; }
+.bj-card-sm .bj-card-corner { font-size: 10px; top: 3px; left: 3px; }
+.bj-card-sm .bj-card-corner span { font-size: 8px; }
+.bj-card-sm .bj-card-corner-br { bottom: 3px; right: 3px; }
+.bj-card-sm .bj-card-center { font-size: 20px; }
+.bj-card-sm.bj-card-back .bj-card-back-mark { font-size: 13px; }
+
+.bjt-topline { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 8px 0 4px; flex-wrap: wrap; }
+
+/* ---- Roulette (2026-07-22, Казино Phase 2) -- same ds-page/dark aesthetic,
+   own rl-* prefix since none of this shares markup with Blackjack. ---- */
+.rl-numbers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; max-width: 480px; margin: 0 auto; }
+.rl-num-btn { aspect-ratio: 1; border-radius: 8px; border: 1.5px solid var(--ds-border); font-weight: 800; font-size: 12px; cursor: pointer; color: #fff; transition: box-shadow .15s ease, transform .15s ease; }
+.rl-num-btn:hover { transform: translateY(-2px); }
+.rl-num-btn.red { background: linear-gradient(160deg, #D7263D, #8f1626); }
+.rl-num-btn.black { background: linear-gradient(160deg, #2a2a2a, #101010); }
+.rl-num-btn.green { background: linear-gradient(160deg, #1f9d63, #0d5c39); }
+.rl-num-btn.active { box-shadow: 0 0 0 3px #00FFD1; }
+.rl-outside-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 14px; }
+.rl-outside-btn { padding: 10px 16px; border-radius: 10px; border: 1.5px solid var(--ds-border); background: rgba(255,255,255,.03); color: var(--ds-text); font-weight: 700; font-size: 12px; cursor: pointer; }
+.rl-outside-btn:hover { border-color: #00FFD1; }
+.rl-outside-btn.active { border-color: #00FFD1; box-shadow: 0 0 0 2px rgba(0,255,209,.3); }
+.rl-chip-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.rl-draft-list { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; max-width: 420px; margin-left: auto; margin-right: auto; }
+.rl-draft-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,.03); border: 1px solid var(--ds-border); font-size: 12px; color: var(--ds-text-dim); }
+.rl-draft-remove { background: none; border: none; color: #C71585; cursor: pointer; font-weight: 800; font-size: 15px; line-height: 1; padding: 0 4px; }
+
+.rl-reel-wrap { position: relative; overflow: hidden; height: 64px; border-radius: 12px; border: 1.5px solid var(--ds-border); background: rgba(0,0,0,.3); margin: 20px auto; max-width: 460px; }
+.rl-reel-marker { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: #00FFD1; box-shadow: 0 0 8px #00FFD1; z-index: 2; transform: translateX(-1px); }
+.rl-reel-strip { position: absolute; top: 0; left: 50%; display: flex; height: 100%; will-change: transform; }
+.rl-reel-cell { width: 54px; height: 100%; flex: none; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; color: #fff; border-right: 1px solid rgba(255,255,255,.08); }
+.rl-reel-cell.red { background: #D7263D; }
+.rl-reel-cell.black { background: #1a1a1a; }
+.rl-reel-cell.green { background: #1f9d63; }
+.rl-reel-result-line { text-align: center; font-family: ui-monospace, monospace; font-size: 13px; font-weight: 700; color: var(--ds-text-dim); margin-top: -8px; }
+
+.rl-seats-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+.rl-seat { width: 156px; border-radius: 14px; border: 1.5px solid var(--ds-border); background: rgba(255,255,255,.02); padding: 12px; text-align: center; }
+.rl-seat.offline { opacity: .45; }
+.rl-seat-name { font-size: 12px; font-weight: 800; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rl-seat-net { margin-top: 8px; font-family: ui-monospace, monospace; font-weight: 800; font-size: 15px; }
+.rl-seat-net.pos { color: #00FFD1; }
+.rl-seat-net.neg { color: #C71585; }
+.rl-seat-net.zero { color: var(--ds-text-dimmer); }
+.rl-seat-bets { margin-top: 6px; font-size: 10px; color: var(--ds-text-dimmer); line-height: 1.5; }
+
+/* ---- Plinko (2026-07-22, Казино Phase 3) -- solo, no table needed. ---- */
+.pk-board { position: relative; width: 100%; max-width: 480px; height: 280px; margin: 20px auto 0; border-radius: 14px; border: 1.5px solid var(--ds-border); background: rgba(0,0,0,.25); overflow: hidden; }
+.pk-peg { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.22); transform: translate(-50%, -50%); }
+.pk-ball { position: absolute; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #00FFD1 60%, #049); box-shadow: 0 0 10px #00FFD1; transform: translate(-50%, -50%); transition: left .28s cubic-bezier(.4,0,.2,1), top .28s cubic-bezier(.4,0,.2,1); z-index: 3; }
+.pk-slots-row { display: flex; max-width: 480px; margin: 0 auto; }
+.pk-slot { flex: 1; text-align: center; padding: 8px 2px; font-size: 10px; font-weight: 800; border-top: 2px solid var(--ds-border); color: var(--ds-text-dimmer); transition: background .2s ease, color .2s ease, border-color .2s ease; }
+.pk-slot.edge { color: #DAA520; }
+.pk-slot.landed { background: rgba(0,255,209,.18); color: #00FFD1; border-top-color: #00FFD1; }
+.pk-result-line { text-align: center; margin-top: 14px; font-size: 16px; font-weight: 800; }
+.pk-result-line.pos { color: #00FFD1; }
+.pk-result-line.neg { color: #C71585; }

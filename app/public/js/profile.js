@@ -7,6 +7,7 @@
 
   let currentNickname = (localStorage.getItem(NICK_KEY) || '').trim();
   let profile = null; // { nickname, correct, incorrect, gamesPlayed, lastSeen, avatar, kkoin }
+  let cabinet = null; // { recentActivity, dailyCounts, achievements, rank, totalPlayers } -- see profileRoutes.js buildCabinetData()
   let locked = false;
   let avatarSaveInFlight = false; // guards double-submit while a PATCH is in flight
 
@@ -47,6 +48,21 @@
   const musicVolumeValue = document.getElementById('music-volume-value');
   const micVolumeEl = document.getElementById('mic-volume');
   const micVolumeValue = document.getElementById('mic-volume-value');
+
+  // ---- cabinet dashboard (2026-07-22 rebuild) ----
+  const heroAvatarWrap = document.getElementById('cab-hero-avatar-wrap');
+  const heroNickname = document.getElementById('cab-hero-nickname');
+  const heroLastseen = document.getElementById('cab-hero-lastseen');
+  const heroBalance = document.getElementById('cab-hero-balance');
+  const cabStatGames = document.getElementById('cab-stat-games');
+  const cabStatAccuracy = document.getElementById('cab-stat-accuracy');
+  const cabStatLastseen = document.getElementById('cab-stat-lastseen');
+  const cabStatRank = document.getElementById('cab-stat-rank');
+  const cabActivityChart = document.getElementById('cab-activity-chart');
+  const cabAchievementsGrid = document.getElementById('cab-achievements-grid');
+  const cabAchievementsProgress = document.getElementById('cab-achievements-progress');
+  const cabActivityFeed = document.getElementById('cab-activity-feed');
+  const cabActivityFeedEmpty = document.getElementById('cab-activity-feed-empty');
 
   // Local copy of the same resize helper player.js uses for avatar uploads.
   // player.js can't be reused directly here -- it's wrapped in its own IIFE
@@ -120,6 +136,127 @@
     renderItems();
     renderAccountBadge();
     applyAdminPanelVisibility();
+    renderCabinet();
+  }
+
+  // ---- cabinet dashboard (2026-07-22 rebuild) --------------------------
+  // Everything below renders `cabinet` (see loadProfile()'s fetch, and
+  // profileRoutes.js's buildCabinetData()) -- real recent activity, real
+  // 7-day counts, real achievement unlock states, and a real KKoin-balance
+  // rank. There is deliberately no level/XP or "Energy" rendering anywhere
+  // here (dima: "no Energy badge, no level system") -- this app doesn't
+  // track either, so the base44 reference's hero fields for them were
+  // dropped rather than faked.
+
+  // Accepts either an ISO date string (profile.lastSeen) or an epoch-ms
+  // number (activity log entries' `ts`) so both the hero/stat-grid "last
+  // seen" and the activity feed's per-row timestamps share one formatter.
+  function formatRelativeTime(input) {
+    if (!input) return '—';
+    const then = typeof input === 'number' ? input : new Date(input).getTime();
+    if (!Number.isFinite(then)) return '—';
+    const diffMs = Date.now() - then;
+    if (diffMs < 60000) return 'щойно';
+    const min = Math.floor(diffMs / 60000);
+    if (min < 60) return min + ' хв тому';
+    const hrs = Math.floor(min / 60);
+    if (hrs < 24) return hrs + ' год тому';
+    const days = Math.floor(hrs / 24);
+    if (days === 1) return 'вчора';
+    if (days < 7) return days + ' дн. тому';
+    const weeks = Math.floor(days / 7);
+    if (weeks < 5) return weeks + ' тижн. тому';
+    return new Date(then).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
+  }
+
+  function renderCabinetHero() {
+    clear(heroAvatarWrap);
+    heroAvatarWrap.appendChild(avatarEl(profile, 68));
+    heroNickname.textContent = profile.nickname;
+    heroLastseen.textContent = 'Востаннє на сайті: ' + formatRelativeTime(profile.lastSeen);
+    heroBalance.textContent = (profile.kkoin || 0) + ' KKoin';
+  }
+
+  function renderCabinetStatGrid() {
+    cabStatGames.textContent = profile.gamesPlayed || 0;
+    const totalAnswered = (profile.correct || 0) + (profile.incorrect || 0);
+    cabStatAccuracy.textContent = totalAnswered > 0 ? Math.round((profile.correct / totalAnswered) * 100) + '%' : '—';
+    cabStatLastseen.textContent = formatRelativeTime(profile.lastSeen);
+    const rank = cabinet && cabinet.rank;
+    cabStatRank.textContent = rank ? ('#' + rank + ' з ' + cabinet.totalPlayers) : '—';
+  }
+
+  // Hand-rolled inline SVG bar chart (no chart library in this vanilla-JS,
+  // no-build-step project) -- built straight from activityStore.getDailyCounts()'s
+  // real [{d,v}] series. viewBox+preserveAspectRatio="none" lets a fixed
+  // internal coordinate system stretch to fill the responsive container
+  // width while keeping every bar's relative proportions identical to what
+  // was computed here. A brand-new profile's all-zero week renders as a
+  // flat row of thin bars -- an honest empty state, not a hidden/special-cased one.
+  function buildActivityChartSvg(dailyCounts) {
+    const W = 350, H = 150, padTop = 20, padBottom = 22;
+    const maxV = Math.max(1, ...dailyCounts.map((d) => d.v || 0));
+    const n = dailyCounts.length || 1;
+    const slot = W / n;
+    const barWidth = slot * 0.46;
+    let bars = '';
+    dailyCounts.forEach((d, i) => {
+      const cx = slot * i + slot / 2;
+      const h = Math.max(d.v > 0 ? Math.round((d.v / maxV) * (H - padTop - padBottom)) : 2, 2);
+      const y = H - padBottom - h;
+      const x = cx - barWidth / 2;
+      bars += '<rect x="' + x.toFixed(1) + '" y="' + y + '" width="' + barWidth.toFixed(1) + '" height="' + h + '" rx="4" fill="url(#cabBarGrad)"></rect>';
+      if (d.v > 0) bars += '<text x="' + cx.toFixed(1) + '" y="' + (y - 6) + '" text-anchor="middle" class="cab-chart-value">' + d.v + '</text>';
+      bars += '<text x="' + cx.toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" class="cab-chart-day-label">' + d.d + '</text>';
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+      '<defs><linearGradient id="cabBarGrad" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="#3DDC97" stop-opacity="0.95"/><stop offset="100%" stop-color="#17B8A6" stop-opacity="0.55"/>' +
+      '</linearGradient></defs>' + bars + '</svg>';
+  }
+
+  function renderCabinetChart() {
+    const dailyCounts = (cabinet && cabinet.dailyCounts) || [];
+    cabActivityChart.innerHTML = buildActivityChartSvg(dailyCounts);
+  }
+
+  function renderCabinetAchievements() {
+    const achievements = (cabinet && cabinet.achievements) || [];
+    const unlockedCount = achievements.filter((a) => a.unlocked).length;
+    cabAchievementsProgress.textContent = unlockedCount + ' / ' + achievements.length;
+    clear(cabAchievementsGrid);
+    achievements.forEach((a) => {
+      cabAchievementsGrid.appendChild(el('div', { class: 'cab-achievement-card' + (a.unlocked ? '' : ' locked') }, [
+        el('div', { class: 'cab-achievement-icon', style: 'border-color:' + a.accent + '; color:' + a.accent + ';' }, [a.emoji]),
+        el('p', { class: 'cab-achievement-title' }, [a.title]),
+        el('p', { class: 'cab-achievement-desc' }, [a.desc])
+      ]));
+    });
+  }
+
+  function renderCabinetFeed() {
+    const activity = (cabinet && cabinet.recentActivity) || [];
+    cabActivityFeedEmpty.style.display = activity.length ? 'none' : '';
+    clear(cabActivityFeed);
+    activity.forEach((entry) => {
+      cabActivityFeed.appendChild(el('div', { class: 'cab-feed-row' + (entry.win ? '' : ' is-loss') }, [
+        el('span', { class: 'cab-feed-dot', style: 'background:' + entry.accent + '; box-shadow:0 0 8px ' + entry.accent + ';' }, []),
+        el('div', { class: 'cab-feed-body' }, [
+          el('p', { class: 'cab-feed-label' }, [entry.label]),
+          el('p', { class: 'cab-feed-detail' }, [entry.detail])
+        ]),
+        el('span', { class: 'cab-feed-time' }, [formatRelativeTime(entry.ts)])
+      ]));
+    });
+  }
+
+  function renderCabinet() {
+    if (!profile) return;
+    renderCabinetHero();
+    renderCabinetStatGrid();
+    renderCabinetChart();
+    renderCabinetAchievements();
+    renderCabinetFeed();
   }
 
   // ---- accounts (2026-07-21 "система реєстрації + логін" expansion) ----
@@ -266,6 +403,7 @@
     api('/api/profile/' + encodeURIComponent(nickname)).then(({ status, data }) => {
       if (status !== 200 || data.error) { toast((data && data.error) || 'Не вдалося завантажити профіль', true); return; }
       profile = data.profile;
+      cabinet = data.cabinet || null;
       locked = !!data.locked;
       currentNickname = profile.nickname;
       localStorage.setItem(NICK_KEY, currentNickname);

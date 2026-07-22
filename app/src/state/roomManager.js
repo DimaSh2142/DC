@@ -8,6 +8,18 @@ const themeState = require('./themeState');
 const playersStore = require('./playersStore');
 const { snakeAssignTeams } = require('../logic/teamBalancer');
 const { checkTextAnswer, checkSelectAnswer } = require('../logic/answerMatcher');
+// Optional-require + try/catch guard, same pattern as blackjackTableManager.js/
+// rouletteTableManager.js/plinkoManager.js -- see activityStore.js's own header
+// comment ("quiz win payout, any mini-game finishing, any casino game
+// settling"): the quiz engine is the last of those three to get wired in,
+// as part of the 2026-07-22 cabinet rebuild's "wire real data where
+// possible" mandate for ActivityFeed/ActivityChart.
+let activityStore = null;
+try { activityStore = require('./activityStore'); } catch (e) { /* optional, see logActivity() below */ }
+function logActivity(nickname, entry) {
+  if (!activityStore) return;
+  try { activityStore.logActivity(nickname, entry); } catch (e) { /* best-effort only */ }
+}
 
 const TEAM_COLOR_BASES = ['turquoise', 'crimson', 'orange'];
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid ambiguity when read aloud
@@ -687,13 +699,26 @@ class RoomManager {
 
     const perPlayer = Math.floor(config.KKOIN_WIN_POOL / winningMemberKeys.length);
     const awardedPlayers = [];
-    if (perPlayer > 0) {
-      for (const key of winningMemberKeys) {
-        const player = room.players.get(key);
-        const nickname = player ? player.nickname : key;
+    const teamNameLabel = winningTeams.map(t => t.name).join(', ');
+    for (const key of winningMemberKeys) {
+      const player = room.players.get(key);
+      const nickname = player ? player.nickname : key;
+      if (perPlayer > 0) {
         const updated = playersStore.addKkoin(nickname, perPlayer);
         awardedPlayers.push({ nickname, newBalance: updated.kkoin });
       }
+      // Real activity-feed entry for the cabinet's ActivityFeed/ActivityChart
+      // -- logged per winning-team member regardless of whether the pool
+      // happened to divide out to 0 KKoin/head (a real team win is still a
+      // real event worth showing), but never for a room that admin:end_game
+      // cut short (this function is deliberately never called on that path,
+      // see the comment near its other call site).
+      logActivity(nickname, {
+        label: 'Вікторина · Перемога команди',
+        detail: 'Команда «' + teamNameLabel + '»' + (perPlayer > 0 ? (' · +' + perPlayer + ' KKoin') : ''),
+        accent: '#20B2AA',
+        win: true
+      });
     }
     room.kkoinAward = {
       teamNames: winningTeams.map(t => t.name),

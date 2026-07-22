@@ -96,6 +96,28 @@ function getAllPlayers() {
   return Object.values(data);
 }
 
+/**
+ * Real leaderboard position by KKoin balance (highest first), for the
+ * cabinet's "Рейтинг" stat card (2026-07-22 rebuild) -- base44's reference
+ * hardcodes "#342" out of nowhere; this instead ranks every player this
+ * server has ever seen against their actual current balance. Ties share the
+ * same displayed rank (standard "competition ranking": 1,2,2,4 -- nobody's
+ * rank changes just because someone else with an identical balance happens
+ * to sort before or after them). Call AFTER getOrCreatePlayer(nickname) so
+ * the player is guaranteed to already be in the store -- a nickname that
+ * genuinely doesn't exist yet returns rank: null rather than a misleading 0.
+ */
+function getRank(nickname) {
+  const all = getAllPlayers();
+  const sorted = all.slice().sort((a, b) => (b.kkoin || 0) - (a.kkoin || 0));
+  const key = keyOf(nickname);
+  const idx = sorted.findIndex((p) => keyOf(p.nickname) === key);
+  if (idx === -1) return { rank: null, total: sorted.length };
+  const myKkoin = sorted[idx].kkoin || 0;
+  const rank = sorted.findIndex((p) => (p.kkoin || 0) === myKkoin) + 1; // first index tied at this balance
+  return { rank, total: sorted.length };
+}
+
 function getStatsFor(nicknames) {
   const data = load();
   return nicknames.map(n => data[keyOf(n)] || getOrCreatePlayer(n));
@@ -214,5 +236,5 @@ function advanceBubbleLevel(nickname, clearedLevel, rewardAmount) {
 
 module.exports = {
   getOrCreatePlayer, recordAnswer, markPlayed, getAllPlayers, getStatsFor, keyOf, adjustAnswer,
-  getProfile, setAvatar, renameNickname, addKkoin, advanceBubbleLevel
+  getProfile, setAvatar, renameNickname, addKkoin, advanceBubbleLevel, getRank
 };
