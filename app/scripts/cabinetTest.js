@@ -105,7 +105,15 @@ function assert(cond, msg) {
 // ================= profileRoutes.buildCabinetData =================
 (function testBuildCabinetData() {
   console.log('\n--- profileRoutes.buildCabinetData: real composition of all 4 sources ---');
-  const nickname = 'CabinetDataUser';
+  // timestamp suffix (not just a fixed literal) so this stays genuinely
+  // unique across repeated RUNS of this script, not just within one run --
+  // activity.json is a real persisted file (unlike an in-memory fixture),
+  // so a fixed nickname here would silently accumulate one more "Казино ·
+  // Рулетка" entry every time this script is re-run, eventually breaking
+  // the exact-length assertions below for reasons that have nothing to do
+  // with the code being tested. Matches this file's own header comment:
+  // "every nickname used below is unique... never needs to reset data/*.json".
+  const nickname = 'CabinetDataUser' + Date.now();
   playersStore.getOrCreatePlayer(nickname);
   playersStore.recordAnswer(nickname, true);
   playersStore.recordAnswer(nickname, true);

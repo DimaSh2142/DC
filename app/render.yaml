@@ -22,3 +22,15 @@ services:
         sync: false   # set this in the Render dashboard, not in git
       - key: SESSION_SECRET
         sync: false   # set this in the Render dashboard, not in git
+      # Optional (2026-07-22) -- without these, players.json/accounts.json/
+      # activity.json/usedThemes.json get wiped every time this free-plan
+      # service redeploys or spins down from inactivity, because the free
+      # plan has no persistent disk and those 4 files are gitignored runtime
+      # state. Leaving both blank is fine (the app just runs local-files-only,
+      # same as before this existed) -- but see README.md "Чому зникають
+      # акаунти на Render" for the 5-minute free fix (a free Upstash Redis
+      # database, no credit card needed).
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false

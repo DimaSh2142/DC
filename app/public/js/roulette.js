@@ -215,7 +215,8 @@
         const wrapWidth = wrap.getBoundingClientRect().width || 460;
         const cellWidth = 54;
         const offset = (seq.length - 0.5) * cellWidth - wrapWidth / 2;
-        strip.style.transition = 'transform 3.2s cubic-bezier(.13,.78,.22,1)';
+        // dima 2026-07-22 "зроби щоб колесо крутилось в 3 рази довше" -- was 3.2s.
+        strip.style.transition = 'transform 9.6s cubic-bezier(.13,.78,.22,1)';
         strip.style.transform = 'translateX(-' + offset + 'px)';
       });
     } else {
@@ -233,7 +234,8 @@
     const seatNodes = tableState.seats.filter(s => s.lastResult).map((s) => {
       const net = s.lastResult.net;
       const cls = net > 0 ? 'pos' : (net < 0 ? 'neg' : 'zero');
-      return el('div', { class: 'rl-seat' + (s.connected ? '' : ' offline') }, [
+      const isMe = s.nickname.trim().toLowerCase() === (nickname || '').trim().toLowerCase();
+      return el('div', { class: 'rl-seat' + (s.connected ? '' : ' offline') + (isMe ? ' is-me' : '') }, [
         avatarEl(s, 32),
         el('div', { class: 'rl-seat-name' }, [s.nickname]),
         el('div', { class: 'rl-seat-net ' + cls }, [(net > 0 ? '+' : '') + net + ' KKoin']),
@@ -256,6 +258,20 @@
       el('div', { class: 'ds-shell' }, [topBarNode(), titleBlockNode('стіл · ' + tableState.code), panel])
     ]));
     refreshBalance(() => { const chip = app.querySelector('.bj-coin-value'); if (chip) chip.textContent = String(balance); });
+
+    // dima 2026-07-22 "додай ефекти гарні, в казино там і в іграх" -- reuses
+    // the wasAlreadyAnimated guard above so this fires exactly once per new
+    // spin, not on every unrelated re-render while the result stays on screen.
+    if (!wasAlreadyAnimated && typeof playEffect === 'function') {
+      const my = mySeat();
+      if (my && my.lastResult) {
+        const anchor = document.querySelector('.rl-seat.is-me') || document.querySelector('.rl-reel-result-line');
+        const hitStraight = my.lastResult.bets.some(b => b.type === 'straight' && b.number === tableState.winningNumber);
+        if (hitStraight) playEffect('lightning', anchor);
+        else if (my.lastResult.net > 0) playEffect('coin-burst', anchor);
+        else if (my.lastResult.net < 0) playEffect('poison', anchor);
+      }
+    }
   }
 
   socket.on('casino:roulette_state', (state) => {
@@ -272,7 +288,7 @@
     }
   });
 
-  requireAccount(app, { title: 'Рулетка', emoji: '🎡' }, (login) => {
+  requireAccount(app, { title: 'Рулетка', emoji: '🎡', backLink: el('a', { href: '/casino.html', class: 'back-link' }, ['← Казино']) }, (login) => {
     nickname = login;
     refreshBalance(() => {
       const stored = localStorage.getItem(TABLE_STORAGE_KEY);

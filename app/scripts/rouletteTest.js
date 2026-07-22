@@ -92,28 +92,37 @@ function assert(cond, msg) {
 (function testSeatingBetting() {
   console.log('\n--- table seating / betting ---');
   const mgr = new RouletteTableManager();
-  const { table } = mgr.createTable('RtHost', 'sock-1', null);
+  // Unique-per-run suffix (same fix as cabinetTest.js's CabinetDataUser and
+  // plinkoTest.js's PlinkoPoor) -- playersStore persists to the REAL
+  // data/players.json and addKkoin() is additive, so a fixed literal name's
+  // balance drifts upward across repeated runs and eventually breaks the
+  // exact-equality assertion below. Caught failing during the 2026-07-22
+  // bubbles.js verification pass (RtHost had drifted well past 100 from
+  // earlier runs).
+  const hostNick = 'RtHost' + Date.now();
+  const guestNick = 'RtGuest' + Date.now();
+  const { table } = mgr.createTable(hostNick, 'sock-1', null);
   const code = table.code;
-  mgr.joinTable(code, 'RtGuest', 'sock-2', null);
+  mgr.joinTable(code, guestNick, 'sock-2', null);
   assert(mgr.getTable(code).seats.length === 2, 'two players seated');
 
-  playersStore.addKkoin('RtHost', 100);
-  playersStore.addKkoin('RtGuest', 3);
+  playersStore.addKkoin(hostNick, 100);
+  playersStore.addKkoin(guestNick, 3);
 
-  const tooMuch = mgr.placeBets(code, 'RtHost', [{ type: 'red', amount: 999 }]);
+  const tooMuch = mgr.placeBets(code, hostNick, [{ type: 'red', amount: 999 }]);
   assert(!!tooMuch.error, 'placeBets rejects a total that exceeds the balance');
 
-  const badShape = mgr.placeBets(code, 'RtHost', [{ type: 'straight', number: 99, amount: 5 }]);
+  const badShape = mgr.placeBets(code, hostNick, [{ type: 'straight', number: 99, amount: 5 }]);
   assert(!!badShape.error, 'placeBets rejects an invalid bet shape (out-of-range straight number)');
 
-  const ok = mgr.placeBets(code, 'RtHost', [{ type: 'red', amount: 10 }, { type: 'straight', number: 4, amount: 5 }]);
+  const ok = mgr.placeBets(code, hostNick, [{ type: 'red', amount: 10 }, { type: 'straight', number: 4, amount: 5 }]);
   assert(ok.ok, 'placeBets accepts a valid multi-bet list');
-  assert(playersStore.getOrCreatePlayer('RtHost').kkoin === 100, 'placing bets alone never touches the balance yet');
+  assert(playersStore.getOrCreatePlayer(hostNick).kkoin === 100, 'placing bets alone never touches the balance yet');
 
   const notSeated = mgr.placeBets(code, 'RandomStranger', [{ type: 'red', amount: 1 }]);
   assert(!!notSeated.error, 'placeBets rejects a nickname that never joined this table');
 
-  const cleared = mgr.placeBets(code, 'RtGuest', []);
+  const cleared = mgr.placeBets(code, guestNick, []);
   assert(cleared.ok, 'an empty bet list is accepted (sitting out this spin)');
 })();
 

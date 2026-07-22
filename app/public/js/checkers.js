@@ -76,13 +76,21 @@
         ])] : [];
         grid.appendChild(el('button', {
           class: cls,
-          onclick: () => {
+          onclick: (e) => {
             if (isDest) {
+              // captured synchronously (while the clicked button is still a
+              // real attached node) since render() below rebuilds the whole
+              // grid from scratch -- e.currentTarget itself won't exist
+              // anymore by the time the socket response comes back, but the
+              // on-screen position it was at is still exactly where the
+              // piece landed, so a plain rect works fine as playEffect's anchor.
+              const clickRect = e.currentTarget.getBoundingClientRect();
               socket.emit('mg:checkers_move', { from: selected, to: [ar, ac] }, (res) => {
                 if (res.error) { toast(res.error, true); return; }
                 playSfx(res.captured ? 'impact' : 'move');
                 selected = res.continueJump ? [ar, ac] : null;
                 render();
+                if (res.captured && typeof playEffect === 'function') playEffect('impact', clickRect);
               });
             } else if (isSelectable) {
               selected = isSelected ? null : [ar, ac];

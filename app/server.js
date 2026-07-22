@@ -1,3 +1,22 @@
+// 2026-07-22: server startup is split into two stages so that
+// remoteBackup.hydrateFromRemote() can finish restoring players.json/
+// accounts.json/activity.json/usedThemes.json from Upstash BEFORE anything
+// else runs. Every other require() below (routes, socket handlers, the
+// various *Manager classes) is deliberately deferred into boot() rather
+// than sitting at the top of the file, because several of them transitively
+// touch playersStore/accountsStore, and those cache their file's contents
+// in memory the FIRST time any exported function is called -- if that
+// happened before hydration finished, it would cache the freshly-wiped-empty
+// local file instead of the restored one, and no amount of hydrating after
+// the fact would fix it (the in-memory cache would already have "won").
+// require() is fine to call late like this -- Node caches modules by path
+// regardless of when they're first required, so this is otherwise identical
+// to the old top-of-file requires, just sequenced to run after hydration.
+require('./src/state/remoteBackup').hydrateFromRemote().catch((err) => {
+  console.warn('[server] unexpected error during hydrateFromRemote, continuing with local files:', err.message);
+}).then(boot);
+
+function boot() {
 const path = require('path');
 const os = require('os');
 const express = require('express');
@@ -72,6 +91,9 @@ server.listen(config.PORT, '0.0.0.0', () => {
   }
   console.log('  Адмін-панель:          /admin.html');
   console.log('  Дефолтний пароль адміна встановлюється в app/.env (ADMIN_PASSWORD)');
+  console.log('  Бекап гравців/акаунтів у Upstash: ' + (require('./src/state/remoteBackup').ENABLED ? 'увімкнено' : 'вимкнено (див. README "Чому зникають акаунти на Render")'));
   console.log('=======================================================');
   console.log('');
 });
+
+} // end boot()

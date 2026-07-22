@@ -138,7 +138,7 @@
       // реальний акаунт. requireAccount() сама вирішує чи вже увійшли
       // (getAuth()) -- якщо так, onReady() спрацює миттєво і renderJoin()
       // покаже звичний екран одразу, без жодної додаткової форми.
-      return requireAccount(app, { title: 'Гравець DSLand', emoji: '🧠', subtitle: 'Увійди, щоб приєднатись до вікторини.' }, (login) => {
+      return requireAccount(app, { title: 'Гравець DSLand', emoji: '🧠', subtitle: 'Увійди, щоб приєднатись до вікторини.', backLink: el('a', { href: '/', class: 'back-link' }, ['← На головну']) }, (login) => {
         me.nickname = login;
         clear(app);
         renderJoin();

@@ -11,6 +11,16 @@
 
 function mgRoomStorageKey(gameType) { return 'mg_room_' + gameType; }
 
+// dima 2026-07-22 "додай ефекти гарні ... в іграх" -- module-scoped (not per-
+// game) is fine here even though this file is shared by 4 games, because
+// each game is its own separate page load with its own fresh JS context;
+// this just needs to stop mgFinishedBanner's effect from re-firing on every
+// unrelated re-render while the SAME finished result stays on screen (same
+// "_settledOnce" idea as blackjack.js/roulette.js use for their own result
+// screens, just keyed by a signature of the banner's own inputs instead of
+// a boolean, since this one function is reused by 4 different games).
+let _mgLastEffectSignature = null;
+
 // Renders the "join or create a room" screen into #app. Calls
 // onJoined({ roomCode, playerIdx, room }) once socket join/create succeeds
 // (the caller owns roomState/render() from that point on).
@@ -26,7 +36,6 @@ function mgRenderJoinScreen(socket, app, opts) {
   });
 
   function renderActualJoinScreen(nickname) {
-    const nickInput = el('input', { type: 'text', value: nickname, maxlength: '24', readonly: 'readonly', title: 'Нікнейм визначається акаунтом -- вийти можна в Особистому кабінеті' });
     const codeInput = el('input', { type: 'text', placeholder: 'Код кімнати', maxlength: '8', style: 'text-transform:uppercase; letter-spacing:3px; font-weight:700;' });
     // dima 2026-07-22 "якщо я хочу зіграти на гроші (KKoins) чому я ніде не
     // можу це поставити" -- optional stake, only settable by whoever CREATES
@@ -64,7 +73,9 @@ function mgRenderJoinScreen(socket, app, opts) {
         el('a', { href: '/minigames.html', class: 'back-link' }, ['← До міні-ігор']),
         el('div', { style: 'text-align:center; font-size:40px; margin-bottom:6px;' }, [opts.emoji]),
         el('h1', { style: 'text-align:center; margin-top:0;' }, [opts.gameLabel]),
-        el('div', { class: 'field' }, [el('label', {}, ['Граєш як']), nickInput]),
+        // dima 2026-07-22 "забери ось це Граєш як, всерівно гравці ж
+        // зареєстровані і знають свої ніки" -- nickname is still used
+        // internally (doCreate/doJoin close over it), just no longer shown.
         el('div', { class: 'field' }, [
           el('div', { class: 'row between', style: 'align-items:baseline;' }, [el('label', { style: 'margin:0;' }, ['Ставка (KKoin), необов’язково']), balanceLabel]),
           stakeInput
@@ -149,7 +160,23 @@ function mgFinishedBanner(myIdx, winnerIdx, resignedIdx, drawReason, onRematch, 
       onRematch();
     }
   }, ['\u{1F501} Грати знову']) : null;
-  return el('div', { class: 'card', style: 'text-align:center; margin:14px 0; border-color:var(--orange);' }, [
+
+  const effectSignature = JSON.stringify([myIdx, winnerIdx, resignedIdx, drawReason, stake]);
+  if (typeof playEffect === 'function' && effectSignature !== _mgLastEffectSignature) {
+    _mgLastEffectSignature = effectSignature;
+    const effectKey = drawReason ? null : (winnerIdx === myIdx ? 'firework' : 'poison');
+    if (effectKey) {
+      // banner isn't in the document yet (the caller appends the node this
+      // function returns) -- defer one frame so the .mg-finished-banner
+      // query below has something real to find.
+      requestAnimationFrame(() => {
+        const anchor = document.querySelector('.mg-finished-banner') || document.body;
+        playEffect(effectKey, anchor);
+      });
+    }
+  }
+
+  return el('div', { class: 'card mg-finished-banner', style: 'text-align:center; margin:14px 0; border-color:var(--orange);' }, [
     el('div', { style: 'font-size:22px; font-weight:800;' }, [title]),
     sub ? el('div', { style: 'font-size:13px; color:var(--turquoise-dark); margin-top:6px;' }, [sub]) : null,
     stakeLine ? el('div', { style: 'font-size:14px; font-weight:700; color:var(--orange); margin-top:8px;' }, [stakeLine]) : null,

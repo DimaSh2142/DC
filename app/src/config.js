@@ -5,6 +5,15 @@ module.exports = {
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'admin123',
   SESSION_SECRET: process.env.SESSION_SECRET || 'change-me',
 
+  // Optional durability backup for the 4 gitignored "runtime state" files
+  // (players/accounts/activity/usedThemes -- see src/state/remoteBackup.js
+  // header for the full story). Both blank = feature is completely off, app
+  // behaves exactly as before. Get these from a free Upstash Redis database
+  // (console.upstash.com, no credit card) -- see README.md "Чому зникають
+  // акаунти на Render" for the 5-step setup.
+  UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL || '',
+  UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+
   // Gameplay tuning -- safe to tweak without touching game logic.
   NEGATIVE_ON_WRONG: true,     // classic "Своя Гра" style: wrong/timeout subtracts price
   ANSWER_TIMEOUT_MS: 45000,    // time a team gets to answer once a question is opened

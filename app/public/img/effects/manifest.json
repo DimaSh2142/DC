@@ -1,0 +1,32 @@
+{
+  "coin-burst": {
+    "frames": 31,
+    "w": 128,
+    "h": 128
+  },
+  "firework": {
+    "frames": 15,
+    "w": 96,
+    "h": 96
+  },
+  "impact": {
+    "frames": 10,
+    "w": 96,
+    "h": 96
+  },
+  "poison": {
+    "frames": 24,
+    "w": 96,
+    "h": 96
+  },
+  "lightning": {
+    "frames": 9,
+    "w": 64,
+    "h": 64
+  },
+  "explosion": {
+    "frames": 13,
+    "w": 128,
+    "h": 128
+  }
+}

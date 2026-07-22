@@ -43,6 +43,22 @@
   };
   const SUIT_COLOR = { '♠': 'var(--hub-text, #E5E5E5)', '♣': 'var(--hub-text, #E5E5E5)', '♥': '#FF3B5C', '♦': '#FF3B5C' };
 
+  // dima 2026-07-22 "додай ефекти гарні, в казино там і в іграх" -- fired
+  // once render() has already put .bj-result-banner on the page (so there's
+  // something to anchor on), from both places solo play can land on 'result'
+  // (blackjack_hit busting/hitting 21, and blackjack_stand resolving the
+  // dealer). push stays quiet -- "nobody really won" doesn't need a burst.
+  function playBjResultEffect(result) {
+    if (typeof playEffect !== 'function' || !result) return;
+    // solo mode has .bj-result-banner; table mode instead has a per-seat
+    // status pill, anchor on MY OWN seat's (.is-me) rather than the whole row.
+    const anchor = document.querySelector('.bj-result-banner') || document.querySelector('.bjt-seat.is-me .bjt-seat-status');
+    if (!anchor) return;
+    if (result === 'win') playEffect('coin-burst', anchor);
+    else if (result === 'bust') playEffect('explosion', anchor);
+    else if (result === 'lose') playEffect('poison', anchor);
+  }
+
   let nickname = null;
   let mode = null; // null (mode-select) | 'solo' | 'table'
 
@@ -252,14 +268,14 @@
             if (res.error) return toast(res.error, true);
             view = res.view;
             playSfx(res.view.phase !== 'player' ? 'impact' : 'move');
-            if (res.view.phase === 'result') refreshBalance(render); else render();
+            if (res.view.phase === 'result') refreshBalance(() => { render(); playBjResultEffect(res.view.result); }); else render();
           });
         }}, ['Ще карту']),
         el('button', { class: 'bj-action-btn bj-action-stand', onclick: () => {
           socket.emit('casino:blackjack_stand', { nickname }, (res) => {
             if (res.error) return toast(res.error, true);
             view = res.view;
-            refreshBalance(render);
+            refreshBalance(() => { render(); if (res.view.phase === 'result') playBjResultEffect(res.view.result); });
           });
         }}, ['Стоп'])
       ]);
@@ -472,6 +488,7 @@
     if (isResult && !renderTablePlayOrResult._settledOnce) {
       renderTablePlayOrResult._settledOnce = true;
       refreshBalance(() => { const chip = app.querySelector('.bj-coin-value'); if (chip) chip.textContent = String(balance); });
+      playBjResultEffect(me && me.result); // _settledOnce already guarantees this fires exactly once per round, anchored on my own seat below
     }
     if (!isResult) renderTablePlayOrResult._settledOnce = false;
   }
@@ -490,7 +507,7 @@
     }
   });
 
-  requireAccount(app, { title: 'Блекджек', emoji: '♠️' }, (login) => {
+  requireAccount(app, { title: 'Блекджек', emoji: '♠️', backLink: el('a', { href: '/casino.html', class: 'back-link' }, ['← Казино']) }, (login) => {
     nickname = login;
     refreshBalance(() => {
       const storedTable = localStorage.getItem(TABLE_STORAGE_KEY);

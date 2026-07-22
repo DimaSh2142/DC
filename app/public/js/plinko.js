@@ -12,7 +12,9 @@
   const socket = io();
   const app = document.getElementById('app');
   const ROWS = 10;
-  const MULTIPLIERS = [1000, 130, 26, 9, 2, 0.5, 2, 9, 26, 130, 1000];
+  // 2026-07-22 rebalance -- kept in sync with games/plinko.js's MULTIPLIERS
+  // by hand (see file header: this copy is display-only).
+  const MULTIPLIERS = [100, 30, 10, 3, 1, 0.5, 1, 3, 10, 30, 100];
 
   let nickname = null;
   let balance = 0;
@@ -56,8 +58,11 @@
   }
 
   function buildSlotsRow(landedIndex) {
+    // "edge" gold styling covers the same top-3-of-6 tiers as before the
+    // 2026-07-22 rebalance (was m>=26 -> 1000/130/26; now m>=10 -> 100/30/10),
+    // so the proportion of the row that reads as a "big win" stays the same.
     return el('div', { class: 'pk-slots-row', id: 'pk-slots-row' }, MULTIPLIERS.map((m, i) => el('div', {
-      class: 'pk-slot' + (m >= 26 ? ' edge' : '') + (landedIndex === i ? ' landed' : '')
+      class: 'pk-slot' + (m >= 10 ? ' edge' : '') + (landedIndex === i ? ' landed' : '')
     }, ['×' + m])));
   }
 
@@ -154,9 +159,23 @@
     customBet = '';
     playSfx(res.net > 0 ? 'impact' : 'move');
     render();
+    // dima 2026-07-22 "додай ефекти гарні, в казино там і в іграх" -- tiered
+    // by how good the multiplier is, from the landed slot itself (the one
+    // with the .landed class buildSlotsRow just added). Only the genuinely
+    // exciting outcomes get a burst -- a plain 1x (breakeven-ish) stays
+    // quiet, same "don't wear out the novelty" restraint as playSfx above.
+    if (typeof playEffect === 'function') {
+      const anchor = document.querySelector('.pk-slot.landed');
+      if (anchor) {
+        if (res.multiplier >= 100) playEffect('lightning', anchor);
+        else if (res.multiplier >= 30) playEffect('firework', anchor);
+        else if (res.multiplier >= 3) playEffect('coin-burst', anchor);
+        else if (res.multiplier <= 0.5) playEffect('poison', anchor);
+      }
+    }
   }
 
-  requireAccount(app, { title: 'Plinko', emoji: '🔴' }, (login) => {
+  requireAccount(app, { title: 'Plinko', emoji: '🔴', backLink: el('a', { href: '/casino.html', class: 'back-link' }, ['← Казино']) }, (login) => {
     nickname = login;
     refreshBalance(render);
   });

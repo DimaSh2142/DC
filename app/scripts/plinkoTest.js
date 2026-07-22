@@ -29,12 +29,13 @@ function assert(cond, msg) {
 // ================= pure logic: multiplierForSlot / payout =================
 (function testMultiplierPayout() {
   console.log('\n--- multiplierForSlot / payout ---');
-  assert(plinko.multiplierForSlot(0) === 1000, 'the far-left edge slot pays the max advertised x1000');
-  assert(plinko.multiplierForSlot(plinko.ROWS) === 1000, 'the far-right edge slot also pays x1000 (symmetric table)');
+  assert(plinko.multiplierForSlot(0) === 100, 'the far-left edge slot pays the max advertised x100 (2026-07-22 rebalance, was x1000)');
+  assert(plinko.multiplierForSlot(plinko.ROWS) === 100, 'the far-right edge slot also pays x100 (symmetric table)');
   const mid = plinko.ROWS / 2;
   assert(plinko.multiplierForSlot(mid) === 0.5, 'the dead-centre slot pays only 0.5x -- most common outcome, smallest multiplier, matches real Plinko economics');
+  assert(plinko.multiplierForSlot(mid - 1) === 1 && plinko.multiplierForSlot(mid + 1) === 1, 'the two slots flanking the centre pay x1 (2026-07-22 rebalance, was x2)');
   assert(plinko.multiplierForSlot(999) === 0, 'an out-of-range slot index safely returns 0, never undefined/NaN');
-  assert(plinko.payout(100, 0) === 100000, 'payout(100, edge slot) is stake * 1000');
+  assert(plinko.payout(100, 0) === 10000, 'payout(100, edge slot) is stake * 100');
   assert(plinko.payout(3, mid) === 1, 'payout(3, centre slot) floors 3*0.5=1.5 down to 1 (never invents fractional KKoin)');
   assert(plinko.payout(1, mid) === 0, 'payout(1, centre slot) floors 1*0.5=0.5 down to 0');
 
@@ -72,15 +73,25 @@ function assert(cond, msg) {
   console.log('\n--- PlinkoManager ---');
   const mgr = new PlinkoManager();
 
+  // PlinkoPoor gets a unique-per-run suffix (like cabinetTest.js's
+  // CabinetDataUser fix) because playersStore persists to the REAL
+  // data/players.json and addKkoin() is additive -- a fixed literal name's
+  // balance would keep drifting upward across repeated runs, eventually
+  // breaking the exact-equality assertion below (this was caught failing
+  // for exactly that reason during the 2026-07-22 bubbles.js verification
+  // pass: PlinkoPoor had accumulated to 4 KKoin from earlier runs, not the
+  // 2 this test assumes). PlinkoRich doesn't need this -- its own checks
+  // below are self-topping-up range checks, not exact equality.
+  const poorNick = 'PlinkoPoor' + Date.now();
   playersStore.addKkoin('PlinkoRich', 500);
-  playersStore.addKkoin('PlinkoPoor', 2);
+  playersStore.addKkoin(poorNick, 2);
 
   const tooMuch = mgr.drop('PlinkoRich', 99999);
   assert(!!tooMuch.error, 'drop() rejects a stake bigger than the balance');
 
-  const tooPoor = mgr.drop('PlinkoPoor', 50);
+  const tooPoor = mgr.drop(poorNick, 50);
   assert(!!tooPoor.error, 'drop() rejects a player whose balance cannot cover the stake');
-  assert(playersStore.getOrCreatePlayer('PlinkoPoor').kkoin === 2, "a rejected drop doesn't touch the balance");
+  assert(playersStore.getOrCreatePlayer(poorNick).kkoin === 2, "a rejected drop doesn't touch the balance");
 
   const noNickname = mgr.drop('', 10);
   assert(!!noNickname.error, 'drop() rejects an empty nickname');

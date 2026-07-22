@@ -27,7 +27,19 @@
       <p class="cas-hero-lede">Класичні ігри в атмосфері справжнього залу. Роби ставку, відчуй драйв і забери свій виграш.</p>
       <div class="cas-hero-badges">
         <span class="cas-hero-badge cas-hero-badge-mint">🛡️ Лише для учасників</span>
-        <span class="cas-hero-badge cas-hero-badge-plain">🪙 Гра на KKoin сайту</span>
+        <span class="cas-hero-badge cas-hero-badge-plain">
+          <!-- dima 2026-07-22 "постав туди анімований трамкоїн" -- swapped the
+               static 🪙 emoji for the real spinning .kcoin component (see its
+               definition in style.css, same one used on profile.html's balance chips). -->
+          <span class="kcoin" style="width:18px; height:18px;">
+            <span class="kcoin-glow"></span>
+            <span class="kcoin-inner">
+              <span class="kcoin-face"><img src="/img/kkrampus-coin.jpg" alt=""></span>
+              <span class="kcoin-back"><span style="font-size:7px;">KK</span></span>
+            </span>
+          </span>
+          Гра на KKoin сайту
+        </span>
       </div>
 
       <!-- Games: ported from GamePanel.jsx -->
@@ -70,7 +82,7 @@
           <div class="ds-card-subtitle">Арена · Кулі</div>
           <p class="ds-card-desc">Скидай кулі та дивись, як вони стрибають до множників.</p>
           <div class="ds-card-meta-row">
-            <div><p class="ds-card-meta-label">Макс. виграш</p><p class="ds-card-meta-value">×1000</p></div>
+            <div><p class="ds-card-meta-label">Макс. виграш</p><p class="ds-card-meta-value">×100</p></div>
             <div><p class="ds-card-meta-label">Гравці</p><p class="ds-card-meta-value">Solo</p></div>
           </div>
           <div class="ds-card-bottom"><span class="ds-card-mode">Ставка KKoin</span><span class="ds-card-arrow">↗</span></div>

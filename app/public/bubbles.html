@@ -8,38 +8,10 @@
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="ds-dark-body">
-  <div class="center-screen">
-    <div class="card" style="max-width:420px; width:100%; text-align:center;">
-      <a href="/minigames.html" class="back-link">← До міні-ігор</a>
-      <h1 style="margin-top:0;">🫧 Бульбашки</h1>
-
-      <div id="gate-section"></div>
-
-      <div id="game-section" style="display:none;">
-        <div class="row between bubbles-hud">
-          <span class="badge outline">🧗 Рівень <span id="bubbles-level">1</span></span>
-          <span class="badge outline">🪙 <span id="bubbles-kkoin">0</span> KKrampus coin</span>
-        </div>
-
-        <div class="bubbles-stage">
-          <canvas id="bubbles-canvas" width="320" height="440"></canvas>
-          <div id="bubbles-overlay" class="bubbles-overlay" style="display:none;">
-            <div class="bubbles-overlay-card">
-              <img id="bubbles-overlay-mascot" class="bubbles-overlay-mascot" src="/img/mascot/catface.png" alt="" style="display:none;">
-              <div id="bubbles-overlay-title" class="bubbles-overlay-title"></div>
-              <div id="bubbles-overlay-sub" class="bubbles-overlay-sub"></div>
-              <button type="button" id="bubbles-overlay-btn"></button>
-            </div>
-          </div>
-        </div>
-
-        <p class="bubbles-help">Цілься мишкою (або пальцем на телефоні) і тапни/клікни по полю, щоб вистрілити. Зістав 3+ бульбашки одного кольору, щоб їх прибрати.</p>
-        <p class="footer-note">Made by DimaSh</p>
-      </div>
-    </div>
-  </div>
+  <div class="container" id="app"></div>
 
   <script src="/js/common.js"></script>
+  <script src="/js/effects.js"></script>
   <script src="/js/bubbles.js"></script>
 </body>
 </html>

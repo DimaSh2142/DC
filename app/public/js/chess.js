@@ -46,6 +46,13 @@
       playSfx(res.captured ? 'impact' : 'move');
       selected = null;
       render();
+      // dima 2026-07-22 "додай ефекти гарні ... в іграх" -- render() just ran
+      // synchronously above, so .last-move is already on the destination
+      // square; anchor there rather than a fixed spot on the board.
+      if (res.captured && typeof playEffect === 'function') {
+        const anchor = document.querySelector('.chess-cell.last-move');
+        if (anchor) playEffect('impact', anchor);
+      }
     });
   }
 

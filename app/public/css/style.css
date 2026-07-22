@@ -610,8 +610,22 @@ th { color: var(--turquoise-dark); }
 @keyframes hub-drift-3 { from { transform: translate(0,0) scale(1); } to { transform: translate(40px,-30px) scale(1.15); } }
 @media (prefers-reduced-motion: reduce) { .hub-sphere { animation: none; } }
 
-/* top bar: styled "Особистий кабінет" button (dima п.5, 2026-07-22: максимально вліво) */
-.hub-topbar { position: relative; z-index: 2; width: 100%; max-width: 900px; display: flex; justify-content: flex-end; margin-bottom: 8px; }
+/* top bar: styled "Особистий кабінет" button.
+   2026-07-22 re-fix (dima: "так і не помістив кнопку персональний кабінет
+   справа так щей якусь хуйню чорну додав зверху") -- the previous version
+   kept .hub-topbar IN NORMAL FLOW as a width:100%;max-width:900px flex row
+   with justify-content:flex-end. Two problems with that: (1) on any
+   viewport wider than 900px the button only reached the right edge of that
+   900px column, not the actual right edge of the screen, so it visibly
+   didn't "fit to the right"; (2) being a full-width block sitting above
+   .hub-hero in flow, ANY background/backdrop-filter bleed on it (or on the
+   frosted-glass .hub-cabinet-btn stretching to fill it) read as a dark bar
+   spanning the top of the page. Fix: take it OUT of flow entirely and pin
+   it straight to the viewport corner -- position:fixed guarantees "right"
+   means the actual screen edge on every width, and there's no full-width
+   box left to accidentally paint as a bar (the wrapper is exactly as wide
+   as the button, nothing more). */
+.hub-topbar { position: fixed; top: 18px; right: 20px; z-index: 50; margin-bottom: 0; }
 .hub-cabinet-btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 20px;
@@ -778,7 +792,11 @@ th { color: var(--turquoise-dark); }
 
 @media (max-width: 480px) {
   .hub-title-neon { font-size: 42px; }
-  .hub-topbar { justify-content: center; }
+  /* fixed corner button (see .hub-topbar above) just needs to sit a bit
+     closer to the edge and shed some padding on a narrow phone screen --
+     no longer a justify-content concern now that it's out of flow. */
+  .hub-topbar { top: 12px; right: 12px; }
+  .hub-cabinet-btn { padding: 8px 14px; font-size: 12px; }
 }
 
 /* ---- small "back to hub" link used on every sub-page (quiz/casino/mini-games/profile) ---- */
@@ -986,10 +1004,14 @@ input[type="range"] {
 .bship-cell.hit { background: var(--crimson); color: var(--white); }
 .bship-cell.sunk { background: var(--crimson-dark); color: var(--white); }
 
+/* dima 2026-07-22 "збільши розмір шах і шашок (саме поле і шахмати) а то
+   дуже маленьке" -- cell size bumped 44px -> 60px (~36%). .checkers-piece
+   and .checkers-piece-img below are both %-based, so they scale for free;
+   only the fixed font-size needs a matching bump. */
 .checkers-grid {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 44px));
-  grid-template-rows: repeat(8, minmax(0, 44px));
+  grid-template-columns: repeat(8, minmax(0, 60px));
+  grid-template-rows: repeat(8, minmax(0, 60px));
   gap: 0;
   border: 3px solid var(--turquoise-dark);
   border-radius: 8px;
@@ -1009,7 +1031,7 @@ input[type="range"] {
   width: 76%; height: 76%;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 16px;
+  font-size: 21px;
   font-weight: 800;
   box-shadow: 0 2px 6px rgba(0,0,0,.35);
   position: relative;
@@ -1031,10 +1053,14 @@ input[type="range"] {
   color: #FFD700; text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 6px rgba(0,0,0,.7);
 }
 
+/* dima 2026-07-22 "збільши розмір шах і шашок ... дуже маленьке" -- cell
+   size bumped 48px -> 64px (~33%); .chess-piece-img is fixed-px (not %),
+   so it needs its own matching bump below (both desktop and the
+   max-width:640px override). */
 .chess-grid {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 48px));
-  grid-template-rows: repeat(8, minmax(0, 48px));
+  grid-template-columns: repeat(8, minmax(0, 64px));
+  grid-template-rows: repeat(8, minmax(0, 64px));
   gap: 0;
   border: 3px solid var(--turquoise-dark);
   border-radius: 8px;
@@ -1044,7 +1070,7 @@ input[type="range"] {
   width: 100%; height: 100%;
   border: none; padding: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 30px;
+  font-size: 40px;
   cursor: pointer;
   line-height: 1;
 }
@@ -1094,12 +1120,12 @@ input[type="range"] {
    squash them). pointer-events:none so clicks still land on the parent
    .chess-cell button, never swallowed by the image itself. ---- */
 .chess-piece-img {
-  width: 36px; height: auto;
+  width: 48px; height: auto;
   image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;
   pointer-events: none;
   filter: drop-shadow(0 2px 2px rgba(0,0,0,.45));
 }
-@media (max-width: 640px) { .chess-piece-img { width: 28px; } }
+@media (max-width: 640px) { .chess-piece-img { width: 38px; } }
 
 /* ---- .btn-12 (dima 2026-07-21, наданий verbatim CSS-компонент) -------------
    Застосовано до кнопки "Я готовий(ва)" у player.js (renderReadyCheck()) --
@@ -1779,3 +1805,60 @@ body.ds-dark-body .room-code { color: #ff5c72; }
 .pk-result-line { text-align: center; margin-top: 14px; font-size: 16px; font-weight: 800; }
 .pk-result-line.pos { color: #00FFD1; }
 .pk-result-line.neg { color: #C71585; }
+
+/* ---- Бульбашки (2026-07-22 visual overhaul) -- dima uploaded an updated
+   base44 reference (BubbleShooter.jsx/Bubble.jsx) purely for its LOOK
+   (glassmorphic frame, glowing gradient balls, aim-dot trail, gradient
+   title) -- the reference's own game logic (fixed board, no persistence,
+   no difficulty curve) is much SIMPLER than the real DSLand version and was
+   deliberately NOT ported; public/js/bubbles.js keeps 100% of its existing
+   hex-grid physics, difficulty-to-level-200 curve, and real server-backed
+   KKoin/level persistence -- only the rendering layer changed (canvas still
+   draws the same coordinate math, now with public/img/bubbles/*.png ball
+   sprites -- "Shiny Balls Hand-Painted Style" by Feti Sumaryanti, see
+   README.md's asset-attribution note -- instead of flat PALETTE fill
+   colors) plus this new .bub-* chrome replacing the old plain .card/
+   .center-screen layout, matching the same .ds-page dark-casino language
+   blackjack/roulette/plinko already use. */
+.bub-page { --ds-obsidian: #0A0E16; }
+.bub-title {
+  background: linear-gradient(135deg, #ffffff 0%, #e0c3fc 35%, #a5b4fc 65%, #ffffff 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+}
+.bub-hud { display: flex; gap: 10px; max-width: 320px; margin: 0 auto 14px; }
+.bub-hud-chip { flex: 1; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid var(--ds-border); background: var(--ds-surface); }
+.bub-hud-icon { font-size: 15px; line-height: 1; }
+.bub-hud-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--ds-text-dimmer); }
+.bub-hud-value { font-size: 15px; font-weight: 900; color: var(--ds-text); margin-left: auto; }
+
+.bub-board-wrap { position: relative; width: 320px; max-width: 100%; margin: 0 auto; }
+.bub-board-frame {
+  position: relative; border-radius: 22px; padding: 3px;
+  background: linear-gradient(135deg, rgba(157,78,221,.55), rgba(255,77,109,.35), rgba(255,215,0,.35));
+  box-shadow: 0 20px 50px rgba(0,0,0,.5);
+}
+.bub-board-inner {
+  position: relative; border-radius: 19px; overflow: hidden;
+  background: radial-gradient(ellipse at center top, rgba(30,25,55,.65) 0%, rgba(8,8,15,.88) 70%, rgba(5,5,10,.94) 100%);
+  box-shadow: inset 0 0 50px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05);
+}
+#bub-canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+
+.bub-overlay {
+  position: absolute; inset: 0; z-index: 5; display: none;
+  flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
+  background: rgba(5,5,10,.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.bub-overlay.show { display: flex; }
+.bub-overlay-icon {
+  width: 56px; height: 56px; border-radius: 50%; margin-bottom: 14px;
+  display: flex; align-items: center; justify-content: center; font-size: 26px;
+  background: radial-gradient(circle at 30% 30%, #FFE066, #FFB800 50%, #B8860B);
+  box-shadow: 0 0 34px rgba(255,184,0,.5);
+}
+.bub-overlay.lose .bub-overlay-icon { background: radial-gradient(circle at 30% 30%, #ff8fa3, #e94560 60%, #9f1830); box-shadow: 0 0 34px rgba(233,69,96,.45); }
+.bub-overlay-title { font-size: 20px; font-weight: 900; color: var(--ds-text); }
+.bub-overlay-sub { font-size: 13px; color: var(--ds-text-dim); margin-top: 6px; max-width: 240px; }
+.bub-overlay-btn { margin-top: 16px; }
+
+.bub-help { text-align: center; font-size: 12px; line-height: 1.65; color: var(--ds-text-dimmer); max-width: 320px; margin: 16px auto 0; }

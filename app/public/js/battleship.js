@@ -156,11 +156,18 @@
         oppGrid.appendChild(el('button', {
           class: cls,
           disabled: usable ? null : 'disabled',
-          onclick: () => {
+          onclick: (e) => {
             if (!usable) return; // belt-and-suspenders, same pattern as player.js's board cells
+            // captured synchronously -- a broadcast-driven render() could
+            // replace this exact node before the socket callback below runs
+            // (see file header: battleship's board updates come from
+            // mg:room_state, not this call's own response), so a plain rect
+            // is safer than holding onto e.currentTarget itself.
+            const clickRect = e.currentTarget.getBoundingClientRect();
             socket.emit('mg:battleship_fire', { x, y }, (res) => {
               if (res.error) { toast(res.error, true); return; }
               playSfx(res.hit ? 'impact' : 'move');
+              if (res.hit && typeof playEffect === 'function') playEffect('impact', clickRect);
             });
           }
         }, [label]));
